@@ -1174,7 +1174,7 @@
     <div id="batchScanPanel" class="hidden" style="margin-top:10px;">
       <div id="batchScanCount" style="text-align:center;font-weight:700;font-size:0.85rem;margin-bottom:6px;">0 items scanned</div>
       <div id="batchScanList" style="max-height:130px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;"></div>
-      <button type="button" class="btn-secondary" style="width:100%;margin-top:8px;font-size:0.8rem;" onclick="forceAlternateScanner()">🔄 Not recognizing this barcode? Try backup scanner</button>
+      <button type="button" class="btn-secondary" id="forceAltScannerBtn" style="width:100%;margin-top:8px;font-size:0.8rem;" onclick="forceAlternateScanner()">🔄 Not recognizing this barcode? Try backup scanner</button>
     </div>
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" id="scannerCancelBtn" onclick="closeScanner()">Cancel</button>
@@ -2774,6 +2774,7 @@ let scannerStream = null;
 let scannerRAF = null;
 let zxingReader = null;
 let scanHandled = false;
+let usingBackupScanner = false;
 let scanContext = 'add';
 let batchScanQueue = [];
 let lastBatchCode = null;
@@ -2802,6 +2803,7 @@ function setScannerStatus(msg){
 async function openScanner(context){
   scanContext = context || 'add';
   scanHandled = false;
+  usingBackupScanner = false;
 
   if(scanContext === 'batch'){
     batchScanQueue = [];
@@ -2912,11 +2914,20 @@ function forceAlternateScanner(){
   if(zxingReader){ try{ zxingReader.reset(); }catch(e){} zxingReader = null; }
   const video = document.getElementById('scannerVideo');
   if(!video || !scannerStream) return;
+  const btn = document.getElementById('forceAltScannerBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '🔄 Switching…'; }
   setScannerStatus('Switching to backup scanner…');
   startZXingFallback(video);
+  if(btn){
+    setTimeout(function(){
+      btn.disabled = false;
+      btn.textContent = '🔄 Switch scanner again';
+    }, 1200);
+  }
 }
 
 function startZXingFallback(video){
+  usingBackupScanner = true;
   if(window.ZXingBrowser){
     runZXing(video);
     return;
@@ -2938,7 +2949,7 @@ function runZXing(video){
       // one instance across multiple decodeOnce calls is unreliable and was
       // the cause of batch scanning silently stopping after the first item.
       zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
-      setScannerStatus(scanContext === 'batch' ? 'Ready — scan as many barcodes as you like' : 'Ready — point at a barcode');
+      setScannerStatus((scanContext === 'batch' ? 'Ready — scan as many barcodes as you like' : 'Ready — point at a barcode') + (usingBackupScanner ? ' (backup scanner active)' : ''));
       zxingReader.decodeOnceFromVideoElement(video).then(async function(result){
         if(result){
           await handleScanResult(result.getText());
