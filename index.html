@@ -2859,7 +2859,7 @@ async function openScanner(context){
 
 function closeScanner(){
   document.getElementById('scannerModal').classList.add('hidden');
-  if(scannerRAF){ cancelAnimationFrame(scannerRAF); scannerRAF = null; }
+  if(scannerRAF){ clearTimeout(scannerRAF); scannerRAF = null; }
   if(zxingReader){ try{ zxingReader.reset(); }catch(e){} zxingReader = null; }
   if(scannerStream){
     scannerStream.getTracks().forEach(t=>t.stop());
@@ -2879,6 +2879,14 @@ function startNativeDetector(video){
   }
   setScannerStatus(scanContext === 'batch' ? 'Ready — scan as many barcodes as you like' : 'Ready — point at a barcode');
   let consecutiveErrors = 0;
+  // Runs a few times a second instead of on every display frame (which can
+  // be 60+ times a second). Nothing about barcode scanning needs that pace
+  // — a person physically holding an item up to the camera can't move
+  // faster than this anyway — but running unthrottled keeps the camera
+  // pipeline and detector under sustained heavy load for as long as batch
+  // mode stays open, which is a very plausible reason a session can lock
+  // up "after a few seconds" even when nothing else is wrong.
+  const SCAN_INTERVAL_MS = 350;
   const scanLoop = async ()=>{
     if(!scannerStream) return;
     try{
@@ -2887,7 +2895,7 @@ function startNativeDetector(video){
       if(codes.length > 0){
         await handleScanResult(codes[0].rawValue);
         if(scanContext === 'batch' && scannerStream){
-          scannerRAF = requestAnimationFrame(scanLoop);
+          scannerRAF = setTimeout(scanLoop, SCAN_INTERVAL_MS);
         }
         return;
       }
@@ -2900,7 +2908,7 @@ function startNativeDetector(video){
         return;
       }
     }
-    scannerRAF = requestAnimationFrame(scanLoop);
+    scannerRAF = setTimeout(scanLoop, SCAN_INTERVAL_MS);
   };
   scanLoop();
 }
@@ -2912,7 +2920,7 @@ function startNativeDetector(video){
 // than guess at a fragile auto-switch timer, this lets the person force
 // the switch themselves, on the same still-running camera stream.
 function forceAlternateScanner(){
-  if(scannerRAF){ cancelAnimationFrame(scannerRAF); scannerRAF = null; }
+  if(scannerRAF){ clearTimeout(scannerRAF); scannerRAF = null; }
   if(zxingReader){ try{ zxingReader.reset(); }catch(e){} zxingReader = null; }
   const video = document.getElementById('scannerVideo');
   if(!video || !scannerStream) return;
