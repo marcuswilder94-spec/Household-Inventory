@@ -1160,7 +1160,7 @@ font-size:23px;flex:0 0 auto}
 
 
 <style id="household-os-build023-location-visuals">
-/* Build 032: calmer Household OS home hero + location-specific visual headers */
+/* Build 033: calmer Household OS home hero + location-specific visual headers */
 .os-home-cover-023{
   position:relative;overflow:hidden;border-radius:22px;margin-bottom:16px;min-height:235px;
   background:
@@ -1483,7 +1483,7 @@ body.os-dark .os-location-edit-actions button{background:#0f172a;color:var(--os-
   </div>
 </section>
 
-<!-- Build 032 branding: Household OS | Your home. Organized. -->
+<!-- Build 033 branding: Household OS | Your home. Organized. -->
 <section id="os-settings-panel" class="os-settings-panel">
   <div class="os-inventory-head">
     <div><h2>Settings & Data</h2><div class="os-item-meta">Customize Household OS, set household defaults, and protect your data.</div></div>
@@ -6639,7 +6639,7 @@ initFirebaseApp();
 
   // Keep version display current.
   document.querySelectorAll('.os-brand small').forEach(el=>{
-    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 032</span>';
+    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 033</span>';
   });
 
   document.addEventListener('DOMContentLoaded',()=>{
@@ -6732,7 +6732,7 @@ initFirebaseApp();
     checks.push(check(size>4.5*1024*1024?'warn':'ok','Local storage usage',`${fmtBytes(size)} currently used by localStorage. ${size>4.5*1024*1024?'This is approaching common browser limits.':'Usage is within a comfortable range.'}`));
 
     const lastSave=Number(localStorage.getItem(LAST_SAVE_KEY)||0);
-    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 032 save heartbeat recorded yet.'));
+    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 033 save heartbeat recorded yet.'));
 
     const root=document.getElementById('os-diag-list');
     if(root)root.innerHTML=checks.map(c=>`
@@ -7626,7 +7626,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build025-fix-styles">
-/* Build 032 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
+/* Build 033 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
 #os-form-panel{
   max-width:1100px;
   margin:0 auto;
@@ -7726,7 +7726,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build026-location-fix-styles">
-/* Build 032: keep legacy location dialogs usable while Household OS shell is active. */
+/* Build 033: keep legacy location dialogs usable while Household OS shell is active. */
 #textModal.os-location-dialog-active,
 #locationsModal.os-location-dialog-active,
 #moveItemsModal.os-location-dialog-active,
@@ -7869,7 +7869,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build027-compat-styles">
-/* Build 032 compatibility/audit cleanup */
+/* Build 033 compatibility/audit cleanup */
 #os-legacy-return{
   position:fixed;right:14px;bottom:18px;z-index:1400;
   border:0;border-radius:999px;padding:11px 14px;
@@ -8016,7 +8016,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build028-modal-close-fix">
-/* Build 032: hidden legacy dialogs must always close, even if an earlier build forced them visible. */
+/* Build 033: hidden legacy dialogs must always close, even if an earlier build forced them visible. */
 .modal-overlay.hidden{
   display:none !important;
 }
@@ -8076,7 +8076,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build029-location-manager-close-styles">
-/* Build 032: make the Manage Locations close state authoritative. */
+/* Build 033: make the Manage Locations close state authoritative. */
 #locationsModal.hidden{
   display:none !important;
   visibility:hidden !important;
@@ -8183,7 +8183,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build030-confirm-modal-fix-styles">
-/* Build 032: confirmation dialogs must remain clickable above all location/photo UI. */
+/* Build 033: confirmation dialogs must remain clickable above all location/photo UI. */
 #confirmModal{
   z-index:2200 !important;
 }
@@ -8292,7 +8292,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build031-confirm-interaction-styles">
-/* Build 032: suspend the parent location manager while its confirmation is active. */
+/* Build 033: suspend the parent location manager while its confirmation is active. */
 body.os-location-confirm-open #locationsModal{
   pointer-events:none !important;
 }
@@ -8412,7 +8412,7 @@ body.os-location-confirm-open #confirmModal button{
 
 
 <style id="household-os-build032-bulk-scanner-styles">
-/* Build 032: scanner controls always stay tappable above the camera layer/navigation. */
+/* Build 033: scanner controls always stay tappable above the camera layer/navigation. */
 #scannerModal{
   z-index:6000 !important;
   touch-action:manipulation;
@@ -8698,6 +8698,238 @@ body.os-location-confirm-open #confirmModal button{
     document.addEventListener('DOMContentLoaded',()=>setTimeout(wireScannerButtons,950));
   }else{
     setTimeout(wireScannerButtons,950);
+  }
+})();
+</script>
+
+
+
+<style id="household-os-build033-scanner-touch-fix-styles">
+/* Build 033: scanner owns the screen while active; background must not receive taps/scrolls. */
+body.os-scanner-open{
+  overflow:hidden !important;
+  touch-action:none;
+}
+body.os-scanner-open #scannerModal{
+  display:flex !important;
+  visibility:visible !important;
+  pointer-events:auto !important;
+  z-index:9000 !important;
+}
+body.os-scanner-open #scannerModal .modal-box,
+body.os-scanner-open #scannerModal .modal-btns,
+body.os-scanner-open #scannerModal button{
+  pointer-events:auto !important;
+  touch-action:manipulation !important;
+}
+body.os-scanner-open #scannerCancelBtn,
+body.os-scanner-open #scannerDoneBtn{
+  position:relative;
+  z-index:9002 !important;
+}
+</style>
+
+<script id="household-os-build033-scanner-touch-fix-engine">
+(function(){
+  let scannerScrollY=0;
+
+  function modal(){ return document.getElementById('scannerModal'); }
+  function cancelBtn(){ return document.getElementById('scannerCancelBtn'); }
+  function doneBtn(){ return document.getElementById('scannerDoneBtn'); }
+
+  function scannerOpen(){
+    const m=modal();
+    return !!(m && !m.classList.contains('hidden'));
+  }
+
+  function prepareScannerModal(){
+    const m=modal();
+    if(!m)return;
+
+    /* Earlier builds sometimes left inline !important styles behind.
+       Remove them every time the scanner opens so CSS can correctly own state. */
+    m.style.removeProperty('display');
+    m.style.removeProperty('pointer-events');
+    m.style.removeProperty('visibility');
+
+    m.classList.remove('hidden');
+    m.classList.remove('os-location-dialog-active');
+    m.style.setProperty('display','flex','important');
+    m.style.setProperty('pointer-events','auto','important');
+    m.style.setProperty('visibility','visible','important');
+
+    scannerScrollY=window.scrollY||0;
+    document.body.classList.add('os-scanner-open');
+  }
+
+  function releaseScannerScreen(){
+    document.body.classList.remove('os-scanner-open');
+    const m=modal();
+    if(m){
+      m.classList.add('hidden');
+      m.classList.remove('os-location-dialog-active');
+      m.style.setProperty('display','none','important');
+      m.style.setProperty('pointer-events','none','important');
+      m.style.setProperty('visibility','hidden','important');
+    }
+  }
+
+  function stopCameraOnly(){
+    try{
+      if(window.scannerRAF){
+        cancelAnimationFrame(window.scannerRAF);
+        window.scannerRAF=null;
+      }
+    }catch(e){}
+
+    try{
+      if(window.zxingReader && typeof window.zxingReader.reset==='function'){
+        window.zxingReader.reset();
+      }
+    }catch(e){}
+    window.zxingReader=null;
+
+    try{
+      if(window.scannerStream){
+        window.scannerStream.getTracks().forEach(t=>t.stop());
+      }
+    }catch(e){}
+    window.scannerStream=null;
+
+    const video=document.getElementById('scannerVideo');
+    if(video){
+      try{video.pause();}catch(e){}
+      video.srcObject=null;
+    }
+  }
+
+  function closeScanner033(){
+    stopCameraOnly();
+    releaseScannerScreen();
+  }
+
+  function doneScanner033(){
+    const queueCount=Array.isArray(window.batchScanQueue)?window.batchScanQueue.length:
+      (typeof batchScanQueue!=='undefined' && Array.isArray(batchScanQueue)?batchScanQueue.length:0);
+
+    stopCameraOnly();
+    releaseScannerScreen();
+
+    if(queueCount===0){
+      if(typeof showInfo==='function')showInfo('No barcodes were scanned.','ℹ️');
+      return;
+    }
+
+    if(typeof showBatchScanReview==='function'){
+      setTimeout(function(){
+        showBatchScanReview();
+        const review=document.getElementById('batchReviewModal');
+        if(review){
+          review.classList.remove('hidden');
+          review.style.setProperty('display','flex','important');
+          review.style.setProperty('pointer-events','auto','important');
+          review.style.setProperty('visibility','visible','important');
+          review.style.setProperty('z-index','9100','important');
+        }
+      },30);
+    }
+  }
+
+  window.closeScanner=closeScanner033;
+  window.finishBatchScan=doneScanner033;
+
+  /* Wrap the existing openScanner instead of replacing its camera logic.
+     The key is to reset modal state before and after camera startup. */
+  const previousOpenScanner=window.openScanner;
+  if(typeof previousOpenScanner==='function'){
+    window.openScanner=async function(context){
+      prepareScannerModal();
+      try{
+        const result=await previousOpenScanner.apply(this,arguments);
+        prepareScannerModal();
+        wireButtons();
+        return result;
+      }catch(err){
+        prepareScannerModal();
+        wireButtons();
+        throw err;
+      }
+    };
+  }
+
+  function pointInside(el,x,y){
+    if(!el || el.classList.contains('hidden'))return false;
+    const r=el.getBoundingClientRect();
+    return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
+  }
+
+  function interceptScannerAction(e){
+    if(!scannerOpen())return;
+
+    let x,y;
+    if(e.changedTouches && e.changedTouches.length){
+      x=e.changedTouches[0].clientX;
+      y=e.changedTouches[0].clientY;
+    }else{
+      x=e.clientX;
+      y=e.clientY;
+    }
+
+    const c=cancelBtn();
+    const d=doneBtn();
+
+    if(pointInside(c,x,y)){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeScanner033();
+      return;
+    }
+
+    if(pointInside(d,x,y)){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      doneScanner033();
+    }
+  }
+
+  function wireButtons(){
+    const c=cancelBtn();
+    const d=doneBtn();
+
+    if(c && c.dataset.osBuild033!=='1'){
+      c.dataset.osBuild033='1';
+      c.removeAttribute('onclick');
+      c.addEventListener('click',function(e){
+        e.preventDefault();e.stopPropagation();closeScanner033();
+      });
+    }
+
+    if(d && d.dataset.osBuild033!=='1'){
+      d.dataset.osBuild033='1';
+      d.removeAttribute('onclick');
+      d.addEventListener('click',function(e){
+        e.preventDefault();e.stopPropagation();doneScanner033();
+      });
+    }
+  }
+
+  /* Capture-phase fallback:
+     even if Safari incorrectly sends the touch to the page behind the modal,
+     use the finger coordinates to execute the scanner button the user touched. */
+  document.addEventListener('touchend',interceptScannerAction,true);
+  document.addEventListener('pointerup',interceptScannerAction,true);
+
+  /* While scanner is visible, prevent page-behind scrolling without blocking
+     touches that begin on the scanner buttons. */
+  document.addEventListener('touchmove',function(e){
+    if(!scannerOpen())return;
+    e.preventDefault();
+  },{capture:true,passive:false});
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){setTimeout(wireButtons,1000);});
+  }else{
+    setTimeout(wireButtons,1000);
   }
 })();
 </script>
