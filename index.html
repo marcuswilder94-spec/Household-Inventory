@@ -1013,6 +1013,7 @@
       <div class="photo-input">
         <img id="f-photo-preview" class="photo-preview hidden">
       </div>
+      <button type="button" id="f-photo-remove-btn" class="btn-secondary hidden" style="width:100%;margin-top:6px;font-size:0.82rem;" onclick="removeAddPhoto()">✕ Remove this photo</button>
       <div id="f-photo-choice" class="hidden" style="margin:10px 0;display:flex;flex-direction:column;gap:8px;">
         <div class="item-notes" style="margin-bottom:2px;">✓ Found a saved photo for this item — what would you like to do?</div>
         <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
@@ -2621,6 +2622,7 @@ function handleAddPhotoChoice(value){
     pendingPhoto = null;
     photoIsAuto = false;
     document.getElementById('f-photo-preview').classList.add('hidden');
+    document.getElementById('f-photo-remove-btn').classList.add('hidden');
     document.getElementById('f-photo-label').classList.add('hidden');
   }
 }
@@ -2652,6 +2654,7 @@ document.getElementById('f-name').addEventListener('input', function(e){
       pendingPhoto = null;
       photoIsAuto = false;
       document.getElementById('f-photo-preview').classList.add('hidden');
+      document.getElementById('f-photo-remove-btn').classList.add('hidden');
     }
     autoPhotoDismissedFor = null;
     showAddPhotoChoice(false);
@@ -2681,7 +2684,16 @@ function setPhotoFromSrc(src, isAuto){
     const preview = document.getElementById('f-photo-preview');
     preview.src = pendingPhoto;
     preview.classList.remove('hidden');
+    document.getElementById('f-photo-remove-btn').classList.remove('hidden');
   });
+}
+
+function removeAddPhoto(){
+  pendingPhoto = null;
+  photoIsAuto = false;
+  autoPhotoDismissedFor = normalizeName(document.getElementById('f-name').value || '');
+  document.getElementById('f-photo-preview').classList.add('hidden');
+  document.getElementById('f-photo-remove-btn').classList.add('hidden');
 }
 
 // ---- Edit-item photo handling ----
@@ -3432,6 +3444,7 @@ function addItem(){
   document.getElementById('f-min').value = 1;
   document.getElementById('f-skip-grocery').checked = false;
   document.getElementById('f-photo-preview').classList.add('hidden');
+  document.getElementById('f-photo-remove-btn').classList.add('hidden');
   document.getElementById('f-nutrition-btn').classList.add('hidden');
   showAddPhotoChoice(false);
   autoPhotoDismissedFor = null;
