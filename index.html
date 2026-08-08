@@ -38,6 +38,15 @@
     --navy-2:var(--ink-2);
     --bg:var(--paper);
   }
+  body.dark-mode{
+    --paper:#16171c;
+    --card:#20222a;
+    --border:#31333d;
+    --text:#e8e9ed;
+    --muted:#9497a6;
+  }
+  body.dark-mode .noimg, body.dark-mode .qty-btn{background:#2a2c36;}
+  body.dark-mode .icon-btn{color:var(--muted);}
   *{box-sizing:border-box;}
   body{
     margin:0;
@@ -184,6 +193,7 @@
   }
   /* ---- Inventory Cards ---- */
   .inv-card{
+    position:relative;
     background:var(--card);
     border:1px solid var(--border);
     border-top:3px solid transparent;
@@ -597,6 +607,67 @@
   }
   .filter-chip.active{background:var(--navy);color:#fff;}
 
+  .sort-filter-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+  }
+  .sort-filter-row select{
+    flex:1;
+    min-width:120px;
+    padding:9px 10px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background:var(--card);
+    color:var(--text);
+    font-size:0.8rem;
+    font-weight:600;
+  }
+  .select-mode-toggle{
+    flex-shrink:0;
+    white-space:nowrap;
+  }
+  .select-mode-toggle.active{background:var(--blue);color:#fff;}
+
+  .inv-card.selected{
+    border-color:var(--blue);
+    box-shadow:0 0 0 2px var(--blue);
+  }
+  .inv-select-checkbox{
+    position:absolute;
+    top:-8px;left:-8px;
+    z-index:2;
+  }
+
+  .select-action-bar{
+    position:fixed;
+    left:0;right:0;
+    bottom:76px;
+    background:var(--navy);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 14px;
+    z-index:39;
+    box-shadow:0 -2px 10px rgba(24,20,10,0.12);
+  }
+  .select-action-bar.hidden{display:none;}
+  .select-action-bar .sab-count{flex:1;font-weight:700;font-size:0.85rem;}
+  .select-action-bar button{
+    background:rgba(255,255,255,0.18);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    padding:8px 12px;
+    font-size:0.76rem;
+    font-weight:700;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .select-action-bar button.danger{background:var(--red);}
+
 .modal-overlay{
   position:fixed;
   top:0;left:0;right:0;bottom:0;
@@ -711,7 +782,16 @@
   <h1>🏠 Household Multi-Location Inventory Tracker</h1>
   <p>Every fridge, freezer, pantry, and closet on one list. Scan it in, watch what's running low, and catch what's expiring before it's wasted.</p>
   <button type="button" class="btn-secondary" style="margin-top:10px;" onclick="doSignOut()">Sign Out</button>
+  <button type="button" class="btn-secondary" style="margin-top:10px;margin-left:8px;" onclick="openSettings()">⚙️ Settings</button>
 </header>
+
+<div class="select-action-bar hidden" id="selectActionBar">
+  <span class="sab-count" id="selectActionCount">0 selected</span>
+  <button type="button" onclick="selectAllVisible()">Select All</button>
+  <button type="button" onclick="openMoveToLocationModal()">Move</button>
+  <button type="button" class="danger" onclick="deleteSelectedItems()">Delete</button>
+  <button type="button" onclick="toggleSelectMode()">Done</button>
+</div>
 
 <nav class="bottom-nav">
   <div class="bottom-nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
@@ -761,6 +841,14 @@
       </div>
 
       <div class="card" style="margin-top:18px;">
+        <h3 style="margin:0 0 12px;font-size:1rem;display:flex;justify-content:space-between;align-items:center;">
+          <span>⚠️ Needs Attention</span>
+          <span onclick="openExpirationCenter()" style="font-size:0.78rem;font-weight:600;color:var(--blue);cursor:pointer;">Expiration Center →</span>
+        </h3>
+        <div id="dashNeedsAttention"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
         <h3 style="margin:0 0 12px;font-size:1rem;">Quick Actions</h3>
         <div class="dash-actions">
           <button type="button" class="dash-action-btn" onclick="switchTab('add')">
@@ -774,6 +862,15 @@
           </button>
           <button type="button" class="dash-action-btn" onclick="switchTab('add');setTimeout(function(){openReceiptScanner();},150);">
             <span class="dash-action-icon">🧾</span><span>Scan Receipt</span>
+          </button>
+          <button type="button" class="dash-action-btn" onclick="openTasksModal()">
+            <span class="dash-action-icon">🧑‍🤝‍🧑</span><span>Tasks</span>
+          </button>
+          <button type="button" class="dash-action-btn" onclick="openFinanceModal()">
+            <span class="dash-action-icon">💰</span><span>Finance</span>
+          </button>
+          <button type="button" class="dash-action-btn" onclick="openMealPlanner()">
+            <span class="dash-action-icon">🍳</span><span>Meal Plan</span>
           </button>
         </div>
       </div>
@@ -830,7 +927,9 @@
         <option>Household Supplies</option>
         <option value="Other">Other (type your own)</option>
       </select>
-      <input type="text" id="f-category-other" class="hidden" placeholder="Type your own category" style="margin-top:8px;">
+      <input type="text" id="f-category-other" class="hidden" placeholder="Type your own category" style="margin-top:8px;" list="customCategorySuggestions">
+      <datalist id="customCategorySuggestions"></datalist>
+      <datalist id="customStoreSuggestions"></datalist>
 
       <label>Preferred store (optional)</label>
       <select id="f-store" onchange="document.getElementById('f-store-other').classList.toggle('hidden', this.value !== 'Other')">
@@ -846,7 +945,7 @@
         <option>Whole Foods</option>
         <option value="Other">Other (type your own)</option>
       </select>
-      <input type="text" id="f-store-other" class="hidden" placeholder="Type your own store" style="margin-top:8px;">
+      <input type="text" id="f-store-other" class="hidden" placeholder="Type your own store" style="margin-top:8px;" list="customStoreSuggestions">
 
       <label>Storage location</label>
       <div class="row2" style="grid-template-columns:1fr auto auto;align-items:end;">
@@ -865,6 +964,10 @@
           <input type="number" id="f-min" min="0" value="1">
         </div>
       </div>
+
+      <label>Price paid (optional)</label>
+      <input type="number" id="f-price" min="0" step="0.01" placeholder="Example: 12.99">
+      <div class="item-notes" style="margin-top:2px;">Price for the quantity above — used for inventory value and spending tracking.</div>
 
       <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;margin-top:10px;">
         <input type="checkbox" id="f-skip-grocery" style="width:auto;">
@@ -944,6 +1047,18 @@
       <button type="button" class="btn-secondary" style="flex:1;" onclick="openManageLocations()">Manage Locations</button>
     </div>
     <div class="filter-row" id="filterRow"></div>
+    <div class="sort-filter-row">
+      <select id="sortModeSelect" onchange="setSortMode(this.value)">
+        <option value="favorite">Sort: Favorites first</option>
+        <option value="name">Sort: Name A–Z</option>
+        <option value="qtyLow">Sort: Quantity, low to high</option>
+        <option value="lowStockFirst">Sort: Low stock first</option>
+      </select>
+      <select id="categoryFilterSelect" onchange="setCategoryFilter(this.value)">
+        <option value="All">All Categories</option>
+      </select>
+      <button type="button" class="btn-secondary select-mode-toggle" id="selectModeToggleBtn" onclick="toggleSelectMode()">☑️ Select</button>
+    </div>
     <div id="inventoryList"></div>
 
     <div class="card">
@@ -957,6 +1072,9 @@
         <button class="btn-secondary" onclick="document.getElementById('importFile').click()">Import Backup</button>
       </div>
       <input type="file" id="importFile" accept="application/json" class="hidden" onchange="importBackup(event)">
+      <div class="btn-row">
+        <button class="btn-secondary" style="flex:1;" onclick="openDiagnostics()">🩺 Diagnostics & Recovery</button>
+      </div>
       <div class="btn-row">
         <button class="btn-danger" onclick="resetInventory()">Reset Inventory</button>
       </div>
@@ -1031,6 +1149,18 @@
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" onclick="closeBatchLocationPicker()">Cancel</button>
       <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmBatchLocationAndScan()">Start Scanning</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="moveToLocationModal">
+  <div class="modal-box" style="max-width:360px;">
+    <h3 style="text-align:center;">📦 Move Selected Items</h3>
+    <p style="text-align:center;" id="moveToLocationCount">Move items to which location?</p>
+    <select id="move-to-location-select"></select>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeMoveToLocationModal()">Cancel</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmMoveSelectedItems()">Move</button>
     </div>
   </div>
 </div>
@@ -1135,6 +1265,132 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="tasksModal">
+  <div class="modal-box" style="max-width:440px;text-align:left;max-height:85vh;overflow-y:auto;">
+    <h3 style="text-align:center;">🧑‍🤝‍🧑 Household Tasks</h3>
+
+    <label>Family Members</label>
+    <div id="task-member-chips" style="margin-bottom:8px;"></div>
+    <div class="photo-input">
+      <input type="text" id="task-new-member" placeholder="Add a family member" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addFamilyMember();}">
+      <button type="button" class="photo-btn" onclick="addFamilyMember()">Add</button>
+    </div>
+
+    <label style="margin-top:16px;">Tasks</label>
+    <div id="taskList" style="margin-bottom:10px;"></div>
+
+    <div class="photo-input">
+      <input type="text" id="task-new-title" placeholder="New task…" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addTask();}">
+    </div>
+    <select id="task-new-assignee" style="margin-top:8px;"></select>
+    <button type="button" class="btn-secondary" style="width:100%;margin-top:8px;" onclick="addTask()">+ Add Task</button>
+
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeTasksModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="expirationCenterModal">
+  <div class="modal-box" style="max-width:460px;text-align:left;max-height:85vh;overflow-y:auto;">
+    <h3 style="text-align:center;">⏳ Expiration Center</h3>
+    <div style="display:flex;gap:6px;margin-bottom:12px;">
+      <button type="button" class="filter-chip active" id="exp-filter-all" onclick="setExpFilter('all')">All</button>
+      <button type="button" class="filter-chip" id="exp-filter-expired" onclick="setExpFilter('expired')">Expired</button>
+      <button type="button" class="filter-chip" id="exp-filter-soon" onclick="setExpFilter('soon')">Expiring Soon</button>
+    </div>
+    <div id="expirationCenterList"></div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeExpirationCenter()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="financeModal">
+  <div class="modal-box" style="max-width:460px;text-align:left;max-height:85vh;overflow-y:auto;">
+    <h3 style="text-align:center;">💰 Finance</h3>
+
+    <div class="dash-stats">
+      <div class="dash-stat good">
+        <div class="dash-stat-value" id="finance-inv-value" style="font-size:1.3rem;">$0.00</div>
+        <div class="dash-stat-label">Inventory Value</div>
+      </div>
+      <div class="dash-stat warn">
+        <div class="dash-stat-value" id="finance-month-spent" style="font-size:1.3rem;">$0.00</div>
+        <div class="dash-stat-label">Spent This Month</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:10px;font-size:0.82rem;color:var(--muted);">All-time spending: <strong id="finance-alltime-spent">$0.00</strong></div>
+
+    <label style="margin-top:16px;">Purchase History</label>
+    <div id="financeHistoryList"></div>
+
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeFinanceModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="mealPlannerModal">
+  <div class="modal-box" style="max-width:440px;text-align:left;max-height:85vh;overflow-y:auto;">
+    <h3 style="text-align:center;">🍳 Meal Planner</h3>
+    <p style="text-align:center;">Plan this week's meals — one line per day.</p>
+    <div id="mealPlanFields"></div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeMealPlanner()">Cancel</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="saveMealPlan()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="settingsModal">
+  <div class="modal-box" style="max-width:400px;text-align:left;">
+    <h3 style="text-align:center;">⚙️ Settings</h3>
+
+    <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600;cursor:pointer;margin-top:6px;">
+      Dark Mode
+      <input type="checkbox" id="set-dark-mode" style="width:auto;transform:scale(1.3);">
+    </label>
+
+    <label style="margin-top:16px;">Expiring soon warning (days)</label>
+    <input type="number" id="set-exp-days" min="1" placeholder="7">
+    <div class="item-notes" style="margin-top:2px;">Items expiring within this many days show the "SOON" tag and appear in the dashboard's Expiring Soon count.</div>
+
+    <label style="margin-top:12px;">Default store for new items (optional)</label>
+    <select id="set-default-store">
+      <option value="">None</option>
+      <option>Walmart</option>
+      <option>Sam's Club</option>
+      <option>Costco</option>
+      <option>Target</option>
+      <option>Kroger</option>
+      <option>Publix</option>
+      <option>Aldi</option>
+      <option>Trader Joe's</option>
+      <option>Whole Foods</option>
+    </select>
+
+    <label style="margin-top:12px;">Default minimum quantity for new items</label>
+    <input type="number" id="set-default-min" min="0" placeholder="1">
+
+    <div class="modal-btns" style="margin-top:18px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeSettings()">Close</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="saveSettingsFromModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="diagnosticsModal">
+  <div class="modal-box" style="max-width:440px;text-align:left;max-height:85vh;overflow-y:auto;">
+    <h3 style="text-align:center;">🩺 Diagnostics & Recovery</h3>
+    <div id="diagnosticsBody"></div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeDiagnostics()">Close</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="exportBackup()">Download Full Backup</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="nutritionModal">
   <div class="modal-box" style="max-width:380px;text-align:left;max-height:85vh;overflow-y:auto;">
     <h3 id="nutrition-modal-title" style="text-align:center;">🥗 Nutrition Facts</h3>
@@ -1185,7 +1441,7 @@
       <option>Household Supplies</option>
       <option value="Other">Other (type your own)</option>
     </select>
-    <input type="text" id="e-category-other" class="hidden" placeholder="Type your own category" style="margin-top:8px;">
+    <input type="text" id="e-category-other" class="hidden" placeholder="Type your own category" style="margin-top:8px;" list="customCategorySuggestions">
 
     <label>Preferred store (optional)</label>
     <select id="e-store" onchange="document.getElementById('e-store-other').classList.toggle('hidden', this.value !== 'Other')">
@@ -1201,7 +1457,7 @@
       <option>Whole Foods</option>
       <option value="Other">Other (type your own)</option>
     </select>
-    <input type="text" id="e-store-other" class="hidden" placeholder="Type your own store" style="margin-top:8px;">
+    <input type="text" id="e-store-other" class="hidden" placeholder="Type your own store" style="margin-top:8px;" list="customStoreSuggestions">
 
     <label>Storage location</label>
     <select id="e-location"></select>
@@ -1216,6 +1472,9 @@
         <input type="number" id="e-min" min="0">
       </div>
     </div>
+
+    <label>Price paid (optional)</label>
+    <input type="number" id="e-price" min="0" step="0.01" placeholder="Example: 12.99">
 
     <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;margin-top:10px;">
       <input type="checkbox" id="e-skip-grocery" style="width:auto;">
@@ -1305,6 +1564,10 @@ let inventory = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || (SEED
 let grocery = JSON.parse(localStorage.getItem(GROCERY_KEY) || 'null') || (SEED_DATA && SEED_DATA.grocery) || [];
 let photoLibrary = JSON.parse(localStorage.getItem(PHOTO_LIBRARY_KEY) || 'null') || (SEED_DATA && SEED_DATA.photoLibrary) || {};
 let activeFilter = 'All';
+let sortMode = 'favorite';
+let categoryFilter = 'All';
+let selectMode = false;
+let selectedItemIds = new Set();
 let pendingPhoto = null;
 let pendingNutrition = null;
 let photoIsAuto = false;
@@ -1328,6 +1591,377 @@ let LOCATIONS = JSON.parse(localStorage.getItem(LOCATIONS_KEY) || 'null') || (SE
 
 const LOCATION_PHOTOS_KEY = 'household_location_photos_v1';
 let locationPhotos = JSON.parse(localStorage.getItem(LOCATION_PHOTOS_KEY) || 'null') || (SEED_DATA && SEED_DATA.locationPhotos) || {};
+
+const SETTINGS_KEY = 'household_settings_v1';
+const DEFAULT_SETTINGS = { darkMode: false, expirationWarningDays: 7, defaultStore: '', defaultMin: 1, receiptScanCount: 0 };
+let appSettings = Object.assign({}, DEFAULT_SETTINGS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') || (SEED_DATA && SEED_DATA.settings) || {});
+function saveSettings(){
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+  applyDarkMode();
+  syncSettingsToCloud();
+  render();
+}
+function applyDarkMode(){
+  document.body.classList.toggle('dark-mode', !!appSettings.darkMode);
+}
+
+// ---- Activity History ----
+const ACTIVITY_KEY = 'household_activity_v1';
+let activityLog = JSON.parse(localStorage.getItem(ACTIVITY_KEY) || 'null') || (SEED_DATA && SEED_DATA.activityLog) || [];
+
+function logActivity(icon, message){
+  activityLog.unshift({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    icon, message, at: Date.now()
+  });
+  if(activityLog.length > 150) activityLog = activityLog.slice(0, 150);
+  localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activityLog));
+  syncActivityToCloud();
+}
+function syncActivityToCloud(){
+  if(cloudSyncActive) cloudDoc('activity').set({ entries: cleanForFirestore(activityLog) }).catch(e=>reportSyncFailure('activity history', e));
+}
+function timeAgo(ts){
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if(min < 1) return 'just now';
+  if(min < 60) return min + 'm ago';
+  const hr = Math.floor(min / 60);
+  if(hr < 24) return hr + 'h ago';
+  const day = Math.floor(hr / 24);
+  if(day < 7) return day + 'd ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+// ---- Household Tasks (family members + tasks) ----
+const FAMILY_KEY = 'household_family_v1';
+const TASKS_KEY = 'household_tasks_v1';
+let familyMembers = JSON.parse(localStorage.getItem(FAMILY_KEY) || 'null') || (SEED_DATA && SEED_DATA.familyMembers) || [];
+let tasks = JSON.parse(localStorage.getItem(TASKS_KEY) || 'null') || (SEED_DATA && SEED_DATA.tasks) || [];
+
+function saveTasksData(){
+  localStorage.setItem(FAMILY_KEY, JSON.stringify(familyMembers));
+  localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+  syncTasksToCloud();
+  renderTasksModal();
+  renderDashboard();
+}
+function syncTasksToCloud(){
+  if(cloudSyncActive) cloudDoc('tasks').set({ familyMembers: cleanForFirestore(familyMembers), tasks: cleanForFirestore(tasks) }).catch(e=>reportSyncFailure('tasks', e));
+}
+
+// ---- Finance / Spending ----
+const SPENDING_KEY = 'household_spending_v1';
+let spendingLog = JSON.parse(localStorage.getItem(SPENDING_KEY) || 'null') || (SEED_DATA && SEED_DATA.spendingLog) || [];
+
+function logSpending(itemName, amount){
+  if(!amount || amount <= 0) return;
+  spendingLog.unshift({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    itemName, amount, at: Date.now()
+  });
+  if(spendingLog.length > 300) spendingLog = spendingLog.slice(0, 300);
+  localStorage.setItem(SPENDING_KEY, JSON.stringify(spendingLog));
+  syncSpendingToCloud();
+}
+function syncSpendingToCloud(){
+  if(cloudSyncActive) cloudDoc('spending').set({ entries: cleanForFirestore(spendingLog) }).catch(e=>reportSyncFailure('spending', e));
+}
+
+function inventoryValue(){
+  return inventory.reduce((sum, i) => sum + ((i.price || 0) * (i.qty || 0)), 0);
+}
+function spentInLastDays(days){
+  const cutoff = Date.now() - (days * 86400000);
+  return spendingLog.filter(s => s.at >= cutoff).reduce((sum, s) => sum + s.amount, 0);
+}
+function spentThisMonth(){
+  const now = new Date();
+  return spendingLog
+    .filter(s => { const d = new Date(s.at); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); })
+    .reduce((sum, s) => sum + s.amount, 0);
+}
+function formatMoney(n){
+  return '$' + (Number(n)||0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function openFinanceModal(){
+  document.getElementById('financeModal').classList.remove('hidden');
+  renderFinanceModal();
+}
+function closeFinanceModal(){
+  document.getElementById('financeModal').classList.add('hidden');
+}
+function renderFinanceModal(){
+  document.getElementById('finance-inv-value').textContent = formatMoney(inventoryValue());
+  document.getElementById('finance-month-spent').textContent = formatMoney(spentThisMonth());
+  document.getElementById('finance-alltime-spent').textContent = formatMoney(spendingLog.reduce((s,e)=>s+e.amount,0));
+
+  const listEl = document.getElementById('financeHistoryList');
+  const recent = spendingLog.slice(0, 20);
+  if(recent.length === 0){
+    listEl.innerHTML = '<div class="empty-state">No purchases logged yet — restocking a priced item from the grocery list logs it here automatically.</div>';
+  } else {
+    listEl.innerHTML = recent.map(e => `
+      <div class="dash-activity-row">
+        <div class="dash-activity-thumb" style="display:flex;align-items:center;justify-content:center;">💵</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;">${escapeHtml(e.itemName)}</div>
+          <div style="color:var(--muted);font-size:0.78rem;">${timeAgo(e.at)}</div>
+        </div>
+        <div style="font-weight:700;color:var(--green);">${formatMoney(e.amount)}</div>
+      </div>`).join('');
+  }
+}
+
+// ---- Meal Planner ----
+const MEAL_KEY = 'household_meal_plan_v1';
+const MEAL_DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+let mealPlan = Object.assign({}, ...MEAL_DAYS.map(d=>({[d]:''})), JSON.parse(localStorage.getItem(MEAL_KEY) || 'null') || (SEED_DATA && SEED_DATA.mealPlan) || {});
+
+function openMealPlanner(){
+  const container = document.getElementById('mealPlanFields');
+  container.innerHTML = MEAL_DAYS.map(day => `
+    <label style="margin-top:10px;">${day}</label>
+    <input type="text" id="meal-${day}" placeholder="What's for dinner?">
+  `).join('');
+  MEAL_DAYS.forEach(day=>{
+    const field = document.getElementById('meal-' + day);
+    if(field) field.value = mealPlan[day] || '';
+  });
+  document.getElementById('mealPlannerModal').classList.remove('hidden');
+}
+function closeMealPlanner(){
+  document.getElementById('mealPlannerModal').classList.add('hidden');
+}
+function saveMealPlan(){
+  MEAL_DAYS.forEach(day=>{
+    const field = document.getElementById('meal-' + day);
+    mealPlan[day] = field ? field.value.trim() : '';
+  });
+  localStorage.setItem(MEAL_KEY, JSON.stringify(mealPlan));
+  syncMealPlanToCloud();
+  closeMealPlanner();
+  showInfo('Meal plan saved.', '🍳');
+}
+function syncMealPlanToCloud(){
+  if(cloudSyncActive) cloudDoc('mealPlan').set(cleanForFirestore(mealPlan)).catch(e=>reportSyncFailure('meal plan', e));
+}
+
+function addFamilyMember(){
+  const input = document.getElementById('task-new-member');
+  const name = input.value.trim();
+  if(!name) return;
+  familyMembers.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), name });
+  input.value = '';
+  saveTasksData();
+}
+function removeFamilyMember(id){
+  familyMembers = familyMembers.filter(m=>m.id!==id);
+  tasks.forEach(t=>{ if(t.assignedTo===id) t.assignedTo = null; });
+  saveTasksData();
+}
+
+function addTask(){
+  const titleInput = document.getElementById('task-new-title');
+  const assignSelect = document.getElementById('task-new-assignee');
+  const title = titleInput.value.trim();
+  if(!title) return;
+  tasks.push({
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    title, assignedTo: assignSelect.value || null, done: false, createdAt: Date.now()
+  });
+  titleInput.value = '';
+  saveTasksData();
+  logActivity('✅', 'Added task "' + title + '"');
+}
+function toggleTask(id){
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  t.done = !t.done;
+  saveTasksData();
+}
+function removeTask(id){
+  tasks = tasks.filter(t=>t.id!==id);
+  saveTasksData();
+}
+
+function openTasksModal(){
+  document.getElementById('tasksModal').classList.remove('hidden');
+  renderTasksModal();
+}
+function closeTasksModal(){
+  document.getElementById('tasksModal').classList.add('hidden');
+}
+function renderTasksModal(){
+  const memberChips = document.getElementById('task-member-chips');
+  if(memberChips){
+    memberChips.innerHTML = familyMembers.length
+      ? familyMembers.map(m => `<span class="low-tag" style="background:#e7eefc;color:var(--blue);font-size:0.78rem;cursor:pointer;" onclick="removeFamilyMember('${m.id}')">${escapeHtml(m.name)} ✕</span>`).join(' ')
+      : '<span style="color:var(--muted);font-size:0.85rem;">No family members added yet.</span>';
+  }
+  const assigneeSelect = document.getElementById('task-new-assignee');
+  if(assigneeSelect){
+    assigneeSelect.innerHTML = '<option value="">Unassigned</option>' + familyMembers.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  }
+  const listEl = document.getElementById('taskList');
+  if(listEl){
+    const sorted = [...tasks].sort((a,b)=> (a.done?1:0) - (b.done?1:0));
+    if(sorted.length === 0){
+      listEl.innerHTML = '<div class="empty-state">No tasks yet — add one below.</div>';
+    } else {
+      listEl.innerHTML = sorted.map(t => {
+        const member = familyMembers.find(m=>m.id===t.assignedTo);
+        return `
+        <div class="dash-activity-row">
+          <div class="checkbox ${t.done?'checked':''}" onclick="toggleTask('${t.id}')" style="cursor:pointer;">${t.done?'✓':''}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;${t.done?'text-decoration:line-through;color:var(--muted);':''}">${escapeHtml(t.title)}</div>
+            <div style="color:var(--muted);font-size:0.78rem;">${member ? escapeHtml(member.name) : 'Unassigned'}</div>
+          </div>
+          <button class="icon-btn" onclick="removeTask('${t.id}')" title="Delete">🗑️</button>
+        </div>`;
+      }).join('');
+    }
+  }
+}
+
+// ---- Expiration Center ----
+let expFilter = 'all';
+function openExpirationCenter(){
+  document.getElementById('expirationCenterModal').classList.remove('hidden');
+  renderExpirationCenter();
+}
+function closeExpirationCenter(){
+  document.getElementById('expirationCenterModal').classList.add('hidden');
+}
+function setExpFilter(f){
+  expFilter = f;
+  ['all','expired','soon'].forEach(name=>{
+    const chip = document.getElementById('exp-filter-' + name);
+    if(chip) chip.classList.toggle('active', name === f);
+  });
+  renderExpirationCenter();
+}
+function renderExpirationCenter(){
+  const listEl = document.getElementById('expirationCenterList');
+  if(!listEl) return;
+  let items = inventory
+    .filter(i=>i.expiryDate)
+    .map(i=>({ item:i, days: daysUntil(i.expiryDate) }))
+    .sort((a,b)=>a.days-b.days);
+
+  if(expFilter === 'expired') items = items.filter(x=>x.days < 0);
+  if(expFilter === 'soon') items = items.filter(x=>x.days >= 0 && x.days <= appSettings.expirationWarningDays);
+
+  if(items.length === 0){
+    listEl.innerHTML = '<div class="empty-state">Nothing here.</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(({item, days}) => {
+    const expired = days < 0;
+    const soon = days >= 0 && days <= appSettings.expirationWarningDays;
+    const label = expired ? 'Expired ' + Math.abs(days) + 'd ago' : (days===0 ? 'Expires today' : 'Expires in ' + days + 'd');
+    return `
+      <div class="dash-activity-row" style="cursor:pointer;" onclick="closeExpirationCenter();switchTab('inventory');setFilter('All');openEditItem('${item.id}');">
+        ${item.photo ? `<img class="dash-activity-thumb" src="${item.photo}">` : `<div class="dash-activity-thumb" style="display:flex;align-items:center;justify-content:center;">📦</div>`}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;">${escapeHtml(item.name)}</div>
+          <div style="color:var(--muted);font-size:0.78rem;">${escapeHtml(item.location)}</div>
+        </div>
+        <div style="color:${expired?'var(--red)':(soon?'var(--amber)':'var(--muted)')};font-weight:700;font-size:0.78rem;white-space:nowrap;">${label}</div>
+      </div>`;
+  }).join('');
+}
+
+function openSettings(){
+  document.getElementById('set-dark-mode').checked = !!appSettings.darkMode;
+  document.getElementById('set-exp-days').value = appSettings.expirationWarningDays;
+  document.getElementById('set-default-store').value = appSettings.defaultStore || '';
+  document.getElementById('set-default-min').value = appSettings.defaultMin;
+  document.getElementById('settingsModal').classList.remove('hidden');
+}
+function closeSettings(){
+  document.getElementById('settingsModal').classList.add('hidden');
+}
+function saveSettingsFromModal(){
+  appSettings.darkMode = document.getElementById('set-dark-mode').checked;
+  appSettings.expirationWarningDays = parseFloat(document.getElementById('set-exp-days').value) || 7;
+  appSettings.defaultStore = document.getElementById('set-default-store').value || '';
+  appSettings.defaultMin = parseFloat(document.getElementById('set-default-min').value) || 1;
+  saveSettings();
+  closeSettings();
+}
+
+function openDiagnostics(){
+  renderDiagnostics();
+  document.getElementById('diagnosticsModal').classList.remove('hidden');
+}
+function closeDiagnostics(){
+  document.getElementById('diagnosticsModal').classList.add('hidden');
+}
+
+// Diagnostics/Recovery panel: a read-only health check, not a live-editing
+// tool. It reports storage usage and simple data-integrity findings, and
+// offers the full-data backup download as the actual recovery action.
+function renderDiagnostics(){
+  const body = document.getElementById('diagnosticsBody');
+  if(!body) return;
+
+  // --- Storage size check ---
+  const storageKeys = [STORAGE_KEY, GROCERY_KEY, PHOTO_LIBRARY_KEY, LOCATIONS_KEY,
+    LOCATION_PHOTOS_KEY, SETTINGS_KEY, ACTIVITY_KEY, FAMILY_KEY, TASKS_KEY, SPENDING_KEY, MEAL_KEY];
+  let totalBytes = 0;
+  storageKeys.forEach(k=>{
+    const v = localStorage.getItem(k);
+    if(v) totalBytes += v.length * 2; // rough UTF-16 byte estimate
+  });
+  const kb = (totalBytes/1024).toFixed(1);
+  const quotaPct = Math.min(100, totalBytes / (5*1024*1024) * 100).toFixed(2);
+
+  // --- Data integrity checks ---
+  const issues = [];
+
+  const idCounts = {};
+  inventory.forEach(i=>{ idCounts[i.id] = (idCounts[i.id]||0)+1; });
+  const dupeIds = Object.keys(idCounts).filter(id=>idCounts[id]>1);
+  if(dupeIds.length) issues.push(`${dupeIds.length} duplicate item ID(s) found in inventory.`);
+
+  const noName = inventory.filter(i=>!i.name || !i.name.trim());
+  if(noName.length) issues.push(`${noName.length} item(s) missing a name.`);
+
+  const badLocs = [...new Set(inventory.filter(i=>!LOCATIONS.includes(i.location)).map(i=>i.location))];
+  if(badLocs.length) issues.push(`Items reference a location that no longer exists: ${badLocs.join(', ')}.`);
+
+  const negQty = inventory.filter(i=>typeof i.qty === 'number' && i.qty < 0);
+  if(negQty.length) issues.push(`${negQty.length} item(s) have a negative quantity.`);
+
+  const badDates = inventory.filter(i=>i.expiryDate && isNaN(new Date(i.expiryDate+'T00:00:00').getTime()));
+  if(badDates.length) issues.push(`${badDates.length} item(s) have an unreadable expiration date.`);
+
+  const groceryNoName = grocery.filter(g=>!g.name || !g.name.trim());
+  if(groceryNoName.length) issues.push(`${groceryNoName.length} grocery list entr${groceryNoName.length===1?'y':'ies'} missing a name.`);
+
+  const issuesHtml = issues.length
+    ? `<ul style="margin:0;padding-left:18px;color:var(--red);font-size:0.85rem;">${issues.map(x=>`<li style="margin-bottom:4px;">${escapeHtml(x)}</li>`).join('')}</ul>`
+    : `<div style="color:var(--green);font-weight:600;font-size:0.85rem;">✅ No issues found — everything checks out.</div>`;
+
+  body.innerHTML = `
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">💾 Local Storage</div>
+      <div style="font-size:0.82rem;color:var(--muted);">${kb} KB used on this device (~${quotaPct}% of a typical 5MB browser limit). Firebase sync has its own separate storage and isn't affected by this.</div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">🔍 Data Integrity</div>
+      ${issuesHtml}
+    </div>
+    <div>
+      <div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;">📦 Snapshot</div>
+      <div style="font-size:0.82rem;color:var(--muted);">${inventory.length} inventory items · ${grocery.length} grocery list entries · ${LOCATIONS.length} locations · ${activityLog.length} activity log entries · 🧾 receipt scan used ${appSettings.receiptScanCount || 0} time${(appSettings.receiptScanCount||0)===1?'':'s'}</div>
+    </div>
+  `;
+}
+
 function saveLocationPhotos(){
   localStorage.setItem(LOCATION_PHOTOS_KEY, JSON.stringify(locationPhotos));
   syncMainToCloud();
@@ -1458,7 +2092,7 @@ let db = null;
 let auth = null;
 let cloudSyncActive = false;
 let firestoreListenersStarted = false;
-let firstSnapshot = { main: false, inventory: false, grocery: false, photoLibrary: false };
+let firstSnapshot = { main: false, settings: false, inventory: false, grocery: false, photoLibrary: false, activity: false, tasks: false, spending: false, mealPlan: false };
 
 function cloudDoc(name){
   return db.collection('households').doc(HOUSEHOLD_ID).collection('data').doc(name);
@@ -1625,6 +2259,18 @@ function initFirestoreSync(){
     firstSnapshot.main = true;
   }, function(err){ console.warn('main sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
 
+  cloudDoc('settings').onSnapshot(function(snap){
+    if(snap.exists){
+      appSettings = Object.assign({}, DEFAULT_SETTINGS, snap.data());
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(appSettings));
+      applyDarkMode();
+      render();
+    } else if(!firstSnapshot.settings){
+      cloudDoc('settings').set(cleanForFirestore(appSettings));
+    }
+    firstSnapshot.settings = true;
+  }, function(err){ console.warn('settings sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
+
   cloudDoc('inventory').onSnapshot(function(snap){
     if(snap.exists){
       inventory = snap.data().items || [];
@@ -1653,6 +2299,53 @@ function initFirestoreSync(){
     }
     firstSnapshot.photoLibrary = true;
   }, function(err){ console.warn('photoLibrary sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
+
+  cloudDoc('activity').onSnapshot(function(snap){
+    if(snap.exists){
+      activityLog = snap.data().entries || [];
+      localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activityLog));
+      renderDashboard();
+    } else if(!firstSnapshot.activity){
+      cloudDoc('activity').set({ entries: cleanForFirestore(activityLog) });
+    }
+    firstSnapshot.activity = true;
+  }, function(err){ console.warn('activity sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
+
+  cloudDoc('tasks').onSnapshot(function(snap){
+    if(snap.exists){
+      const data = snap.data();
+      familyMembers = data.familyMembers || [];
+      tasks = data.tasks || [];
+      localStorage.setItem(FAMILY_KEY, JSON.stringify(familyMembers));
+      localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+      renderTasksModal();
+      renderDashboard();
+    } else if(!firstSnapshot.tasks){
+      cloudDoc('tasks').set({ familyMembers: cleanForFirestore(familyMembers), tasks: cleanForFirestore(tasks) });
+    }
+    firstSnapshot.tasks = true;
+  }, function(err){ console.warn('tasks sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
+
+  cloudDoc('spending').onSnapshot(function(snap){
+    if(snap.exists){
+      spendingLog = snap.data().entries || [];
+      localStorage.setItem(SPENDING_KEY, JSON.stringify(spendingLog));
+      renderDashboard();
+    } else if(!firstSnapshot.spending){
+      cloudDoc('spending').set({ entries: cleanForFirestore(spendingLog) });
+    }
+    firstSnapshot.spending = true;
+  }, function(err){ console.warn('spending sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
+
+  cloudDoc('mealPlan').onSnapshot(function(snap){
+    if(snap.exists){
+      mealPlan = Object.assign({}, ...MEAL_DAYS.map(d=>({[d]:''})), snap.data());
+      localStorage.setItem(MEAL_KEY, JSON.stringify(mealPlan));
+    } else if(!firstSnapshot.mealPlan){
+      cloudDoc('mealPlan').set(cleanForFirestore(mealPlan));
+    }
+    firstSnapshot.mealPlan = true;
+  }, function(err){ console.warn('mealPlan sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
 }
 
 // Push the full current state of each "table." Called from the existing save
@@ -1678,6 +2371,9 @@ function syncGroceryToCloud(){
 }
 function syncMainToCloud(){
   if(cloudSyncActive) cloudDoc('main').set({ locations: cleanForFirestore(LOCATIONS), locationPhotos: cleanForFirestore(locationPhotos) }).catch(e=>reportSyncFailure('locations', e));
+}
+function syncSettingsToCloud(){
+  if(cloudSyncActive) cloudDoc('settings').set(cleanForFirestore(appSettings)).catch(e=>reportSyncFailure('settings', e));
 }
 function syncPhotoLibraryToCloud(){
   if(cloudSyncActive) cloudDoc('photoLibrary').set({ library: cleanForFirestore(photoLibrary) }).catch(e=>reportSyncFailure('photo library', e));
@@ -1918,6 +2614,21 @@ function switchTab(tab){
   document.getElementById('tab-add').classList.toggle('hidden', tab!=='add');
   window.scrollTo(0,0);
   if(tab==='dashboard') renderDashboard();
+  if(tab==='add') applyAddFormDefaults();
+}
+
+// Pre-fills the Add form's minimum quantity and preferred store from
+// Settings — only when the form is still at its untouched starting state,
+// so it never overwrites something the person is partway through typing.
+function applyAddFormDefaults(){
+  const minField = document.getElementById('f-min');
+  if(minField && minField.value === '1' && appSettings.defaultMin !== 1){
+    minField.value = appSettings.defaultMin;
+  }
+  const storeField = document.getElementById('f-store');
+  if(storeField && !storeField.value && appSettings.defaultStore){
+    storeField.value = appSettings.defaultStore;
+  }
 }
 
 // ---- Photo handling ----
@@ -2378,7 +3089,8 @@ function addBatchItems(){
       expiryDate: null,
       photo: b.photo || null,
       nutrition: null,
-      favorite: false
+      favorite: false,
+      price: null
     };
     inventory.push(item);
     checkReorder(item);
@@ -2386,6 +3098,9 @@ function addBatchItems(){
     added++;
   });
   closeBatchReviewModal();
+  if(added > 0){
+    logActivity('📷', 'Bulk-scanned ' + added + ' item' + (added===1?'':'s') + ' into ' + location);
+  }
   save();
   switchTab('inventory');
   showInfo(added + ' item' + (added===1?'':'s') + ' added to inventory.', '✅');
@@ -2654,6 +3369,32 @@ function getCategoryFieldValue(prefix){
 
 const STORE_OPTIONS = ["Walmart","Sam's Club","Costco","Target","Kroger","Publix","Aldi","Trader Joe's","Whole Foods"];
 
+// Suggests previously-typed CUSTOM categories/stores (ones that don't match a
+// preset dropdown option) in the "Other" free-text fields, so the same
+// hand-typed value doesn't have to be retyped from scratch or accidentally
+// duplicated with a slightly different spelling. Pulled live from both
+// inventory and the grocery list's snapshot fields, since either can hold a
+// custom value.
+function renderAutocompleteSuggestions(){
+  const catList = document.getElementById('customCategorySuggestions');
+  const storeList = document.getElementById('customStoreSuggestions');
+  if(!catList || !storeList) return;
+
+  const isPreset = (val, presets) => presets.some(p => p.toLowerCase() === (val||'').toLowerCase());
+
+  const customCats = new Set();
+  const customStores = new Set();
+  [...inventory, ...grocery].forEach(x=>{
+    if(x.category && !isPreset(x.category, CATEGORY_OPTIONS)) customCats.add(x.category);
+    if(x.store && !isPreset(x.store, STORE_OPTIONS)) customStores.add(x.store);
+  });
+
+  catList.innerHTML = [...customCats].sort((a,b)=>a.localeCompare(b))
+    .map(c=>`<option value="${escapeHtml(c)}"></option>`).join('');
+  storeList.innerHTML = [...customStores].sort((a,b)=>a.localeCompare(b))
+    .map(s=>`<option value="${escapeHtml(s)}"></option>`).join('');
+}
+
 function setStoreField(prefix, value){
   const select = document.getElementById(prefix + '-store');
   const other = document.getElementById(prefix + '-store-other');
@@ -2841,6 +3582,10 @@ function addReceiptItems(){
     }
   });
   closeReceiptModal();
+  if(added > 0){
+    appSettings.receiptScanCount = (appSettings.receiptScanCount || 0) + 1;
+    saveSettings();
+  }
   save();
   showInfo(added + ' item(s) added from the receipt to ' + location + '. Edit category or dates for any of them from the Inventory tab.', '🧾');
   switchTab('inventory');
@@ -2871,10 +3616,12 @@ function addItem(){
     expiryDate: document.getElementById('f-expiry-date').value || null,
     photo: pendingPhoto,
     nutrition: pendingNutrition,
-    favorite: false
+    favorite: false,
+    price: parseFloat(document.getElementById('f-price').value) || null
   };
   inventory.push(item);
   checkReorder(item);
+  logActivity('➕', 'Added "' + item.name + '" to ' + item.location);
   if(item.photo){
     savePhotoToLibrary(item.name, item.photo);
   }
@@ -2954,7 +3701,9 @@ function changeQty(id, delta){
 function removeItem(id){
   openConfirmModal('Remove this item from inventory?', function(ok){
     if(!ok) return;
+    const item = inventory.find(i=>i.id===id);
     inventory = inventory.filter(i=>i.id!==id);
+    if(item) logActivity('🗑️', 'Removed "' + item.name + '" from ' + item.location);
     save();
   });
 }
@@ -2977,6 +3726,7 @@ function openEditItem(id){
   populateLocationSelect(item.location, 'e-location');
   document.getElementById('e-qty').value = item.qty;
   document.getElementById('e-min').value = item.min;
+  document.getElementById('e-price').value = item.price || '';
   document.getElementById('e-skip-grocery').checked = !!item.skipGrocery;
   document.getElementById('e-unit').value = item.unit || '';
   setMultiPackFields('e', item);
@@ -3027,6 +3777,7 @@ function saveEditItem(){
   item.location = document.getElementById('e-location').value;
   item.qty = parseFloat(document.getElementById('e-qty').value) || 0;
   item.min = parseFloat(document.getElementById('e-min').value) || 0;
+  item.price = parseFloat(document.getElementById('e-price').value) || null;
   item.skipGrocery = document.getElementById('e-skip-grocery').checked;
   item.unit = document.getElementById('e-unit').value.trim();
   const editMultiPack = getMultiPackValues('e');
@@ -3158,6 +3909,7 @@ function clearPurchased(){
     let item = inventory.find(i=>i.id===g.itemId);
     if(item){
       item.qty = Math.max(item.qty, item.min + 1, 1);
+      if(item.price) logSpending(item.name, item.price);
     } else {
       // The original item was deleted from inventory while this was sitting
       // on the grocery list — rebuild it from the saved snapshot instead of
@@ -3183,12 +3935,16 @@ function clearPurchased(){
         expiryDate: null,
         photo: g.photo || null,
         nutrition: null,
-        favorite: false
+        favorite: false,
+        price: null
       };
       inventory.push(rebuilt);
       if(rebuilt.photo) savePhotoToLibrary(rebuilt.name, rebuilt.photo);
     }
   });
+  if(purchased.length > 0){
+    logActivity('🛒', 'Restocked ' + purchased.length + ' item' + (purchased.length===1?'':'s') + ' from the grocery list');
+  }
   grocery = grocery.filter(g=>!g.purchased);
   save();
 }
@@ -3214,7 +3970,10 @@ function confirmReset(){
 }
 
 function exportBackup(){
-  const data = JSON.stringify({inventory, grocery, locations: LOCATIONS, locationPhotos, photoLibrary}, null, 2);
+  const data = JSON.stringify({
+    inventory, grocery, locations: LOCATIONS, locationPhotos, photoLibrary,
+    settings: appSettings, activityLog, familyMembers, tasks, spendingLog, mealPlan
+  }, null, 2);
   const filename = 'household_inventory_backup.json';
   const blob = new Blob([data], {type:'application/json'});
   const file = new File([blob], filename, {type:'application/json'});
@@ -3285,6 +4044,39 @@ function importBackup(e){
         localStorage.setItem(PHOTO_LIBRARY_KEY, JSON.stringify(photoLibrary));
         syncPhotoLibraryToCloud();
       }
+      if(data.activityLog){
+        data.activityLog.forEach(entry=>{
+          if(!activityLog.some(a=>a.id===entry.id)) activityLog.push(entry);
+        });
+        activityLog.sort((a,b)=>b.at-a.at);
+        if(activityLog.length > 150) activityLog = activityLog.slice(0, 150);
+        localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activityLog));
+        syncActivityToCloud();
+      }
+      if(data.familyMembers){
+        data.familyMembers.forEach(m=>{
+          if(!familyMembers.some(f=>f.id===m.id)) familyMembers.push(m);
+        });
+      }
+      if(data.tasks){
+        data.tasks.forEach(t=>{
+          if(!tasks.some(x=>x.id===t.id)) tasks.push(t);
+        });
+      }
+      if(data.familyMembers || data.tasks) saveTasksData();
+      if(data.spendingLog){
+        data.spendingLog.forEach(s=>{
+          if(!spendingLog.some(x=>x.id===s.id)) spendingLog.push(s);
+        });
+        spendingLog.sort((a,b)=>b.at-a.at);
+        if(spendingLog.length > 300) spendingLog = spendingLog.slice(0, 300);
+        localStorage.setItem(SPENDING_KEY, JSON.stringify(spendingLog));
+        syncSpendingToCloud();
+      }
+      // Settings and meal plan are included in backups for reference but are
+      // intentionally NOT auto-applied here — silently overwriting the
+      // current device's dark mode / thresholds / meal plan on import would
+      // be surprising. Restore those manually from the JSON file if needed.
       populateLocationSelect();
       save();
       showInfo(added + ' item(s) added to inventory.', '✅');
@@ -3309,6 +4101,108 @@ function renderFilters(){
   ).join('');
 }
 function setFilter(c){ activeFilter = c; render(); }
+
+function renderCategoryFilterOptions(){
+  const sel = document.getElementById('categoryFilterSelect');
+  if(!sel) return;
+  const cats = [...new Set(inventory.map(i=>i.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const prevValue = categoryFilter;
+  sel.innerHTML = `<option value="All">All Categories</option>` +
+    cats.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  // If the previously-selected category no longer exists (e.g. last item in it was removed), reset to All.
+  if(prevValue !== 'All' && !cats.includes(prevValue)){
+    categoryFilter = 'All';
+  }
+  sel.value = categoryFilter;
+  const sortSel = document.getElementById('sortModeSelect');
+  if(sortSel) sortSel.value = sortMode;
+  const toggleBtn = document.getElementById('selectModeToggleBtn');
+  if(toggleBtn){
+    toggleBtn.classList.toggle('active', selectMode);
+    toggleBtn.textContent = selectMode ? '✕ Cancel Select' : '☑️ Select';
+  }
+}
+
+function renderSelectActionBar(){
+  const bar = document.getElementById('selectActionBar');
+  if(!bar) return;
+  bar.classList.toggle('hidden', !selectMode);
+  const countEl = document.getElementById('selectActionCount');
+  if(countEl) countEl.textContent = `${selectedItemIds.size} selected`;
+}
+
+function setSortMode(mode){ sortMode = mode; render(); }
+function setCategoryFilter(cat){ categoryFilter = cat; render(); }
+
+function sortItems(items){
+  const byFavorite = (a,b) => (b.favorite?1:0) - (a.favorite?1:0);
+  const arr = items.slice();
+  if(sortMode === 'name'){
+    arr.sort((a,b) => byFavorite(a,b) || a.name.localeCompare(b.name));
+  } else if(sortMode === 'qtyLow'){
+    arr.sort((a,b) => byFavorite(a,b) || (a.qty - b.qty));
+  } else if(sortMode === 'lowStockFirst'){
+    arr.sort((a,b) => byFavorite(a,b) || ((a.qty<=a.min?0:1) - (b.qty<=b.min?0:1)) || (a.qty - b.qty));
+  } else {
+    arr.sort(byFavorite);
+  }
+  return arr;
+}
+
+function toggleSelectMode(){
+  selectMode = !selectMode;
+  selectedItemIds.clear();
+  render();
+}
+
+function toggleItemSelect(id){
+  if(selectedItemIds.has(id)) selectedItemIds.delete(id);
+  else selectedItemIds.add(id);
+  render();
+}
+
+function selectAllVisible(){
+  const locs = activeFilter==='All' ? LOCATIONS : [activeFilter];
+  inventory
+    .filter(i => locs.includes(i.location) && (categoryFilter==='All' || i.category===categoryFilter))
+    .forEach(i => selectedItemIds.add(i.id));
+  render();
+}
+
+function deleteSelectedItems(){
+  if(selectedItemIds.size===0) return;
+  const count = selectedItemIds.size;
+  openConfirmModal(`Remove ${count} selected item${count===1?'':'s'} from inventory?`, function(ok){
+    if(!ok) return;
+    inventory = inventory.filter(i => !selectedItemIds.has(i.id));
+    logActivity('🗑️', `Removed ${count} item${count===1?'':'s'} (batch select)`);
+    selectMode = false;
+    selectedItemIds.clear();
+    save();
+  });
+}
+
+function openMoveToLocationModal(){
+  if(selectedItemIds.size===0) return;
+  const sel = document.getElementById('move-to-location-select');
+  sel.innerHTML = LOCATIONS.map(l=>`<option>${escapeHtml(l)}</option>`).join('');
+  document.getElementById('moveToLocationCount').textContent =
+    `Move ${selectedItemIds.size} selected item${selectedItemIds.size===1?'':'s'} to which location?`;
+  document.getElementById('moveToLocationModal').classList.remove('hidden');
+}
+function closeMoveToLocationModal(){
+  document.getElementById('moveToLocationModal').classList.add('hidden');
+}
+function confirmMoveSelectedItems(){
+  const newLoc = document.getElementById('move-to-location-select').value;
+  const count = selectedItemIds.size;
+  inventory.forEach(i => { if(selectedItemIds.has(i.id)) i.location = newLoc; });
+  logActivity('📦', `Moved ${count} item${count===1?'':'s'} to ${newLoc}`);
+  closeMoveToLocationModal();
+  selectMode = false;
+  selectedItemIds.clear();
+  save();
+}
 
 function daysUntil(dateStr){
   const d = new Date(dateStr + 'T00:00:00');
@@ -3410,7 +4304,7 @@ function renderDashboard(){
   const lowCount = inventory.filter(i=>i.qty <= i.min).length;
   const expiringCount = inventory
     .filter(i=>i.expiryDate)
-    .filter(i=>daysUntil(i.expiryDate) <= 7).length;
+    .filter(i=>daysUntil(i.expiryDate) <= appSettings.expirationWarningDays).length;
   const groceryActiveCount = grocery.filter(g=>!g.purchased && !g.skipped).length;
 
   const setText = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
@@ -3421,18 +4315,44 @@ function renderDashboard(){
 
   const activityEl = document.getElementById('dashRecentActivity');
   if(activityEl){
-    const recent = [...inventory]
-      .sort((a,b)=> (parseInt(b.id,36)||0) - (parseInt(a.id,36)||0))
-      .slice(0, 5);
+    const recent = activityLog.slice(0, 6);
     if(recent.length === 0){
-      activityEl.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Nothing added yet — tap "Add Item" to get started.</div>';
+      activityEl.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Nothing logged yet — tap "Add Item" to get started.</div>';
     } else {
-      activityEl.innerHTML = recent.map(item => `
+      activityEl.innerHTML = recent.map(entry => `
         <div class="dash-activity-row">
+          <div class="dash-activity-thumb" style="display:flex;align-items:center;justify-content:center;">${entry.icon || '•'}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;">${escapeHtml(entry.message)}</div>
+            <div style="color:var(--muted);font-size:0.78rem;">${timeAgo(entry.at)}</div>
+          </div>
+        </div>`).join('');
+    }
+  }
+
+  // ---- Needs Attention (low stock + expiring, surfaced together) ----
+  const attentionEl = document.getElementById('dashNeedsAttention');
+  if(attentionEl){
+    const lowItems = inventory.filter(i=>i.qty <= i.min && !i.skipGrocery);
+    const expiringItems = inventory.filter(i=>i.expiryDate && daysUntil(i.expiryDate) <= appSettings.expirationWarningDays);
+    const combined = [];
+    lowItems.forEach(i => combined.push({ item:i, reason: 'Low stock — ' + i.qty + ' left (min ' + i.min + ')', urgent:false }));
+    expiringItems.forEach(i => {
+      const d = daysUntil(i.expiryDate);
+      combined.push({ item:i, reason: d < 0 ? 'Expired ' + Math.abs(d) + 'd ago' : (d===0 ? 'Expires today' : 'Expires in ' + d + 'd'), urgent: d <= 0 });
+    });
+    combined.sort((a,b)=> (b.urgent?1:0) - (a.urgent?1:0));
+    const top = combined.slice(0, 5);
+
+    if(top.length === 0){
+      attentionEl.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;">Nothing needs attention right now. 🎉</div>';
+    } else {
+      attentionEl.innerHTML = top.map(({item, reason, urgent}) => `
+        <div class="dash-activity-row" style="cursor:pointer;" onclick="switchTab('inventory');setFilter('All');openEditItem('${item.id}');">
           ${item.photo ? `<img class="dash-activity-thumb" src="${item.photo}">` : `<div class="dash-activity-thumb" style="display:flex;align-items:center;justify-content:center;">📦</div>`}
           <div style="flex:1;min-width:0;">
             <div style="font-weight:600;">${escapeHtml(item.name)}</div>
-            <div style="color:var(--muted);font-size:0.78rem;">${escapeHtml(item.location)} · Qty ${item.qty}</div>
+            <div style="color:${urgent?'var(--red)':'var(--amber)'};font-size:0.78rem;font-weight:600;">${escapeHtml(reason)}</div>
           </div>
         </div>`).join('');
     }
@@ -3450,12 +4370,15 @@ function render(){
   }
   renderDashboard();
   renderFilters();
+  renderCategoryFilterOptions();
+  renderSelectActionBar();
+  renderAutocompleteSuggestions();
 
   // Expiring soon summary
   const expiringSoon = inventory
     .filter(i=>i.expiryDate)
     .map(i=>({item:i, days:daysUntil(i.expiryDate)}))
-    .filter(x=>x.days <= 7)
+    .filter(x=>x.days <= appSettings.expirationWarningDays)
     .sort((a,b)=>a.days-b.days);
 
   const expSummary = document.getElementById('expiringSummary');
@@ -3499,8 +4422,7 @@ function render(){
   let anyItems = false;
 
   locs.forEach(loc=>{
-    const items = inventory.filter(i=>i.location===loc)
-      .sort((a,b)=> (b.favorite?1:0) - (a.favorite?1:0));
+    const items = sortItems(inventory.filter(i=>i.location===loc && (categoryFilter==='All' || i.category===categoryFilter)));
     if(items.length===0) return;
     anyItems = true;
     const locColor = getLocationColor(loc);
@@ -3513,7 +4435,7 @@ function render(){
       const low = item.qty <= item.min;
       const days = item.expiryDate ? daysUntil(item.expiryDate) : null;
       const expired = days !== null && days < 0;
-      const soon = days !== null && days >= 0 && days <= 7;
+      const soon = days !== null && days >= 0 && days <= appSettings.expirationWarningDays;
       const dateBits = [];
       if(item.purchaseDate) dateBits.push('Purchased ' + formatDate(item.purchaseDate));
       if(item.frozenDate) dateBits.push('Frozen ' + formatDate(item.frozenDate));
@@ -3521,12 +4443,15 @@ function render(){
       const boxCount = (item.packsPerBox && item.qty > 0 && item.qty % item.packsPerBox === 0)
         ? item.qty / item.packsPerBox : null;
       const cardStyle = `border-top-color:${locColor};` + (filterPhoto ? 'background:rgba(255,255,255,0.9);' : '');
+      const isSelected = selectedItemIds.has(item.id);
       html += `
-        <div class="inv-card" style="${cardStyle}">
+        <div class="inv-card ${isSelected?'selected':''}" style="${cardStyle}">
           <div class="inv-card-top">
             <div class="inv-card-photo">
               ${item.photo ? `<img class="thumb" src="${item.photo}">` : `<div class="noimg">📦</div>`}
-              <button class="inv-fav-btn" onclick="toggleFavorite('${item.id}')" title="${item.favorite?'Remove favorite':'Mark favorite'}">${item.favorite?'⭐':'☆'}</button>
+              ${selectMode
+                ? `<div class="checkbox inv-select-checkbox ${isSelected?'checked':''}" onclick="toggleItemSelect('${item.id}')">${isSelected?'✓':''}</div>`
+                : `<button class="inv-fav-btn" onclick="toggleFavorite('${item.id}')" title="${item.favorite?'Remove favorite':'Mark favorite'}">${item.favorite?'⭐':'☆'}</button>`}
             </div>
             <div class="inv-card-body">
               <div class="inv-card-name">${escapeHtml(item.name)}${low?'<span class="low-tag">LOW</span>':''}${(low && item.skipGrocery)?'<span class="low-tag" style="background:#eef0f3;color:var(--muted);">NOT ON LIST</span>':''}${expired?'<span class="low-tag" style="background:#fdeeec;color:var(--red);">EXPIRED</span>':(soon?'<span class="low-tag" style="background:#fff4e0;color:var(--amber);">SOON</span>':'')}</div>
@@ -3537,6 +4462,10 @@ function render(){
               ${item.notes ? `<div class="item-notes">${escapeHtml(item.notes)}</div>` : ''}
             </div>
           </div>
+          ${selectMode ? `
+          <div class="inv-card-footer">
+            <button class="btn-secondary" style="width:100%;" onclick="toggleItemSelect('${item.id}')">${isSelected?'✓ Selected — tap to deselect':'Tap to select'}</button>
+          </div>` : `
           <div class="inv-card-footer">
             <button class="qty-btn" onclick="changeQty('${item.id}',-1)">−</button>
             <div style="display:flex;flex-direction:column;align-items:center;min-width:26px;">
@@ -3548,7 +4477,7 @@ function render(){
             ${item.nutrition ? `<button class="icon-btn" onclick="showItemNutrition('${item.id}')" title="Nutrition Facts">🥗</button>` : ''}
             <button class="icon-btn" onclick="openEditItem('${item.id}')" title="Edit">✏️</button>
             <button class="icon-btn" onclick="removeItem('${item.id}')" title="Remove">🗑️</button>
-          </div>
+          </div>`}
         </div>`;
     });
     html += `</div>`;
@@ -3595,6 +4524,7 @@ function escapeHtml(str){
 
 populateLocationSelect();
 updateMultiPackHelp('f');
+applyDarkMode();
 render();
 initFirebaseApp();
 </script>
