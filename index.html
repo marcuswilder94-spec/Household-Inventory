@@ -1150,7 +1150,7 @@ font-size:23px;flex:0 0 auto}
 
 
 <style id="household-os-build023-location-visuals">
-/* Build 024: calmer Household OS home hero + location-specific visual headers */
+/* Build 025: calmer Household OS home hero + location-specific visual headers */
 .os-home-cover-023{
   position:relative;overflow:hidden;border-radius:22px;margin-bottom:16px;min-height:235px;
   background:
@@ -1473,7 +1473,7 @@ body.os-dark .os-location-edit-actions button{background:#0f172a;color:var(--os-
   </div>
 </section>
 
-<!-- Build 024 branding: Household OS | Your home. Organized. -->
+<!-- Build 025 branding: Household OS | Your home. Organized. -->
 <section id="os-settings-panel" class="os-settings-panel">
   <div class="os-inventory-head">
     <div><h2>Settings & Data</h2><div class="os-item-meta">Customize Household OS, set household defaults, and protect your data.</div></div>
@@ -6558,7 +6558,7 @@ initFirebaseApp();
 
   // Keep version display current.
   document.querySelectorAll('.os-brand small').forEach(el=>{
-    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 024</span>';
+    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 025</span>';
   });
 
   document.addEventListener('DOMContentLoaded',()=>{
@@ -6651,7 +6651,7 @@ initFirebaseApp();
     checks.push(check(size>4.5*1024*1024?'warn':'ok','Local storage usage',`${fmtBytes(size)} currently used by localStorage. ${size>4.5*1024*1024?'This is approaching common browser limits.':'Usage is within a comfortable range.'}`));
 
     const lastSave=Number(localStorage.getItem(LAST_SAVE_KEY)||0);
-    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 024 save heartbeat recorded yet.'));
+    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 025 save heartbeat recorded yet.'));
 
     const root=document.getElementById('os-diag-list');
     if(root)root.innerHTML=checks.map(c=>`
@@ -7539,6 +7539,106 @@ window.HOUSEHOLD_OS_BRAND = {
     });
     observer.observe(shell,{childList:true,subtree:true});
   });
+})();
+</script>
+
+
+
+<style id="household-os-build025-fixes">
+/* Build 025 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
+#os-form-panel{
+  max-width:1100px;
+  margin:0 auto;
+  padding:22px 16px 190px;
+  box-sizing:border-box;
+  min-height:100vh;
+}
+#os-form-panel .os-form-actions{
+  flex-wrap:wrap;
+  padding-bottom:12px;
+}
+#os-inventory-panel{
+  max-width:1100px;
+  margin:0 auto;
+  padding:22px 16px 180px;
+  box-sizing:border-box;
+  min-height:100vh;
+}
+.os-empty-welcome{
+  grid-column:1/-1;
+  text-align:center;
+  background:var(--os-card);
+  border:1px solid var(--os-border);
+  border-radius:18px;
+  padding:30px 20px;
+  box-shadow:var(--os-shadow);
+}
+.os-empty-welcome .icon{font-size:34px;margin-bottom:8px}
+.os-empty-welcome h3{margin:0 0 7px;font-size:20px}
+.os-empty-welcome p{margin:0 auto 16px;max-width:480px;color:var(--os-muted);line-height:1.45}
+@media(max-width:620px){
+  #os-form-panel,#os-inventory-panel{padding:16px 12px 210px}
+  #os-form-panel .os-form-actions{display:grid;grid-template-columns:1fr;width:100%}
+  #os-form-panel .os-form-actions button{width:100%}
+}
+</style>
+
+<script id="household-os-build025-fixes">
+(function(){
+  function openModernFullInventory(){
+    if(typeof window.osOpenInventory==='function'){
+      window.osOpenInventory();
+      setTimeout(function(){
+        if(typeof window.osRenderInventory==='function')window.osRenderInventory();
+        window.scrollTo({top:0,behavior:'smooth'});
+      },30);
+      return;
+    }
+    alert('Inventory is loading. Please try again in a moment.');
+  }
+
+  function improveEmptyInventory(){
+    var inv=Array.isArray(window.inventory)?window.inventory:[];
+    var grid=document.getElementById('os-item-grid');
+    if(!grid || inv.length)return;
+    grid.innerHTML='<div class="os-empty-welcome"><div class="icon">📦</div><h3>Your inventory is empty</h3><p>Nothing is wrong — you have not added any household items yet. Add your first item and it will appear here automatically.</p><button class="os-primary" onclick="osOpenAddForm()">＋ Add Your First Item</button></div>';
+    var sub=document.getElementById('os-inv-subtitle');
+    if(sub)sub.textContent='0 items • Ready for your first item';
+  }
+
+  function wireBuild025(){
+    document.querySelectorAll('#os-shell button').forEach(function(btn){
+      if(btn.textContent.trim()==='Open Full Inventory')btn.onclick=openModernFullInventory;
+    });
+
+    var note=document.querySelector('#os-form-panel .os-danger-note');
+    if(note)note.textContent='Need product photos, nutrition lookup, barcode camera scanning, or advanced multi-pack tools? Use Advanced Add below.';
+
+    var previousOpen=window.osOpenAddForm;
+    if(typeof previousOpen==='function'){
+      window.osOpenAddForm=function(){
+        var result=previousOpen.apply(this,arguments);
+        setTimeout(function(){window.scrollTo({top:0,behavior:'auto'});},20);
+        return result;
+      };
+    }
+
+    var previousRender=window.osRenderInventory;
+    if(typeof previousRender==='function'){
+      window.osRenderInventory=function(){
+        var result=previousRender.apply(this,arguments);
+        improveEmptyInventory();
+        return result;
+      };
+    }
+    improveEmptyInventory();
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){setTimeout(wireBuild025,450);});
+  }else{
+    setTimeout(wireBuild025,450);
+  }
 })();
 </script>
 
