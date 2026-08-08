@@ -1160,7 +1160,7 @@ font-size:23px;flex:0 0 auto}
 
 
 <style id="household-os-build023-location-visuals">
-/* Build 030: calmer Household OS home hero + location-specific visual headers */
+/* Build 031: calmer Household OS home hero + location-specific visual headers */
 .os-home-cover-023{
   position:relative;overflow:hidden;border-radius:22px;margin-bottom:16px;min-height:235px;
   background:
@@ -1483,7 +1483,7 @@ body.os-dark .os-location-edit-actions button{background:#0f172a;color:var(--os-
   </div>
 </section>
 
-<!-- Build 030 branding: Household OS | Your home. Organized. -->
+<!-- Build 031 branding: Household OS | Your home. Organized. -->
 <section id="os-settings-panel" class="os-settings-panel">
   <div class="os-inventory-head">
     <div><h2>Settings & Data</h2><div class="os-item-meta">Customize Household OS, set household defaults, and protect your data.</div></div>
@@ -6639,7 +6639,7 @@ initFirebaseApp();
 
   // Keep version display current.
   document.querySelectorAll('.os-brand small').forEach(el=>{
-    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 030</span>';
+    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 031</span>';
   });
 
   document.addEventListener('DOMContentLoaded',()=>{
@@ -6732,7 +6732,7 @@ initFirebaseApp();
     checks.push(check(size>4.5*1024*1024?'warn':'ok','Local storage usage',`${fmtBytes(size)} currently used by localStorage. ${size>4.5*1024*1024?'This is approaching common browser limits.':'Usage is within a comfortable range.'}`));
 
     const lastSave=Number(localStorage.getItem(LAST_SAVE_KEY)||0);
-    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 030 save heartbeat recorded yet.'));
+    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 031 save heartbeat recorded yet.'));
 
     const root=document.getElementById('os-diag-list');
     if(root)root.innerHTML=checks.map(c=>`
@@ -7626,7 +7626,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build025-fix-styles">
-/* Build 030 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
+/* Build 031 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
 #os-form-panel{
   max-width:1100px;
   margin:0 auto;
@@ -7726,7 +7726,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build026-location-fix-styles">
-/* Build 030: keep legacy location dialogs usable while Household OS shell is active. */
+/* Build 031: keep legacy location dialogs usable while Household OS shell is active. */
 #textModal.os-location-dialog-active,
 #locationsModal.os-location-dialog-active,
 #moveItemsModal.os-location-dialog-active,
@@ -7869,7 +7869,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build027-compat-styles">
-/* Build 030 compatibility/audit cleanup */
+/* Build 031 compatibility/audit cleanup */
 #os-legacy-return{
   position:fixed;right:14px;bottom:18px;z-index:1400;
   border:0;border-radius:999px;padding:11px 14px;
@@ -8016,7 +8016,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build028-modal-close-fix">
-/* Build 030: hidden legacy dialogs must always close, even if an earlier build forced them visible. */
+/* Build 031: hidden legacy dialogs must always close, even if an earlier build forced them visible. */
 .modal-overlay.hidden{
   display:none !important;
 }
@@ -8076,7 +8076,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build029-location-manager-close-styles">
-/* Build 030: make the Manage Locations close state authoritative. */
+/* Build 031: make the Manage Locations close state authoritative. */
 #locationsModal.hidden{
   display:none !important;
   visibility:hidden !important;
@@ -8183,7 +8183,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build030-confirm-modal-fix-styles">
-/* Build 030: confirmation dialogs must remain clickable above all location/photo UI. */
+/* Build 031: confirmation dialogs must remain clickable above all location/photo UI. */
 #confirmModal{
   z-index:2200 !important;
 }
@@ -8285,6 +8285,126 @@ body.os-legacy-open #os-shell{display:none!important}
     document.addEventListener('DOMContentLoaded',()=>setTimeout(wireConfirmButtons,800));
   }else{
     setTimeout(wireConfirmButtons,800);
+  }
+})();
+</script>
+
+
+
+<style id="household-os-build031-confirm-interaction-styles">
+/* Build 031: suspend the parent location manager while its confirmation is active. */
+body.os-location-confirm-open #locationsModal{
+  pointer-events:none !important;
+}
+body.os-location-confirm-open #confirmModal{
+  pointer-events:auto !important;
+  z-index:5000 !important;
+}
+body.os-location-confirm-open #confirmModal .modal-box,
+body.os-location-confirm-open #confirmModal .modal-btns,
+body.os-location-confirm-open #confirmModal button{
+  pointer-events:auto !important;
+  touch-action:manipulation;
+}
+</style>
+
+<script id="household-os-build031-confirm-interaction-engine">
+(function(){
+  function confirmModalEl(){ return document.getElementById('confirmModal'); }
+  function locationsModalEl(){ return document.getElementById('locationsModal'); }
+
+  function setConfirmOpen(open){
+    document.body.classList.toggle('os-location-confirm-open', !!open);
+    const parent=locationsModalEl();
+    if(parent){
+      parent.setAttribute('aria-hidden', open ? 'true' : 'false');
+    }
+  }
+
+  const previousOpenConfirm=window.openConfirmModal;
+  window.openConfirmModal=function(message, callback){
+    setConfirmOpen(true);
+
+    if(typeof previousOpenConfirm==='function'){
+      previousOpenConfirm.call(this,message,callback);
+    }else{
+      const msg=document.getElementById('confirmModalMsg');
+      if(msg)msg.textContent=message||'Are you sure?';
+      window.confirmModalCallback=typeof callback==='function'?callback:null;
+      const modal=confirmModalEl();
+      if(modal){
+        modal.classList.remove('hidden');
+        modal.style.setProperty('display','flex','important');
+      }
+    }
+
+    const modal=confirmModalEl();
+    if(modal){
+      modal.classList.remove('hidden');
+      modal.style.setProperty('display','flex','important');
+      modal.style.setProperty('pointer-events','auto','important');
+    }
+  };
+
+  function finishConfirm(answer){
+    const cb=window.confirmModalCallback;
+    const modal=confirmModalEl();
+
+    if(modal){
+      modal.classList.add('hidden');
+      modal.classList.remove('os-location-dialog-active');
+      modal.style.setProperty('display','none','important');
+      modal.style.setProperty('pointer-events','none','important');
+    }
+
+    window.confirmModalCallback=null;
+    setConfirmOpen(false);
+
+    if(typeof cb==='function'){
+      try{ cb(!!answer); }catch(err){ console.error(err); }
+    }
+
+    /* Keep the manager open after No; after Yes its callback may redraw/remove.
+       In either case refresh the manager and modern Locations summary. */
+    if(typeof window.renderLocationsList==='function'){
+      try{ window.renderLocationsList(); }catch(e){}
+    }
+    if(typeof window.osRenderLocations==='function'){
+      setTimeout(window.osRenderLocations,0);
+    }
+  }
+
+  window.confirmModalRespond=finishConfirm;
+
+  function wire(){
+    const modal=confirmModalEl();
+    if(!modal)return;
+    const buttons=[...modal.querySelectorAll('button')];
+    const noBtn=buttons.find(b=>b.textContent.trim()==='No');
+    const yesBtn=buttons.find(b=>b.textContent.trim()==='Yes');
+
+    [noBtn,yesBtn].forEach((btn,index)=>{
+      if(!btn)return;
+      const clone=btn.cloneNode(true);
+      clone.removeAttribute('onclick');
+      clone.dataset.osBuild031='1';
+      btn.replaceWith(clone);
+
+      const answer=index===1;
+      const activate=function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        finishConfirm(answer);
+      };
+      clone.addEventListener('click',activate,{passive:false});
+      clone.addEventListener('touchend',activate,{passive:false});
+    });
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>setTimeout(wire,900));
+  }else{
+    setTimeout(wire,900);
   }
 })();
 </script>
