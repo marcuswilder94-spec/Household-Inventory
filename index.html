@@ -1150,7 +1150,7 @@ font-size:23px;flex:0 0 auto}
 
 
 <style id="household-os-build023-location-visuals">
-/* Build 025: calmer Household OS home hero + location-specific visual headers */
+/* Build 026: calmer Household OS home hero + location-specific visual headers */
 .os-home-cover-023{
   position:relative;overflow:hidden;border-radius:22px;margin-bottom:16px;min-height:235px;
   background:
@@ -1473,7 +1473,7 @@ body.os-dark .os-location-edit-actions button{background:#0f172a;color:var(--os-
   </div>
 </section>
 
-<!-- Build 025 branding: Household OS | Your home. Organized. -->
+<!-- Build 026 branding: Household OS | Your home. Organized. -->
 <section id="os-settings-panel" class="os-settings-panel">
   <div class="os-inventory-head">
     <div><h2>Settings & Data</h2><div class="os-item-meta">Customize Household OS, set household defaults, and protect your data.</div></div>
@@ -6558,7 +6558,7 @@ initFirebaseApp();
 
   // Keep version display current.
   document.querySelectorAll('.os-brand small').forEach(el=>{
-    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 025</span>';
+    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 026</span>';
   });
 
   document.addEventListener('DOMContentLoaded',()=>{
@@ -6651,7 +6651,7 @@ initFirebaseApp();
     checks.push(check(size>4.5*1024*1024?'warn':'ok','Local storage usage',`${fmtBytes(size)} currently used by localStorage. ${size>4.5*1024*1024?'This is approaching common browser limits.':'Usage is within a comfortable range.'}`));
 
     const lastSave=Number(localStorage.getItem(LAST_SAVE_KEY)||0);
-    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 025 save heartbeat recorded yet.'));
+    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 026 save heartbeat recorded yet.'));
 
     const root=document.getElementById('os-diag-list');
     if(root)root.innerHTML=checks.map(c=>`
@@ -7545,7 +7545,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build025-fixes">
-/* Build 025 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
+/* Build 026 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
 #os-form-panel{
   max-width:1100px;
   margin:0 auto;
@@ -7638,6 +7638,149 @@ window.HOUSEHOLD_OS_BRAND = {
     document.addEventListener('DOMContentLoaded',function(){setTimeout(wireBuild025,450);});
   }else{
     setTimeout(wireBuild025,450);
+  }
+})();
+</script>
+
+
+
+<style id="household-os-build026-location-fixes">
+/* Build 026: keep legacy location dialogs usable while Household OS shell is active. */
+#textModal.os-location-dialog-active,
+#locationsModal.os-location-dialog-active,
+#moveItemsModal.os-location-dialog-active,
+#confirmModal.os-location-dialog-active,
+#infoModal.os-location-dialog-active{
+  display:flex !important;
+  z-index:1000 !important;
+}
+</style>
+
+<script id="household-os-build026-location-fixes">
+(function(){
+  function showExternalModal(id){
+    var el=document.getElementById(id);
+    if(!el)return null;
+    el.classList.remove('hidden');
+    el.classList.add('os-location-dialog-active');
+    el.style.display='flex';
+    return el;
+  }
+  function hideExternalModal(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    el.classList.add('hidden');
+    el.classList.remove('os-location-dialog-active');
+    el.style.display='none';
+  }
+
+  /* The original modal elements live outside #os-shell. Build 001 hides those
+     elements when the new shell starts, so class-only open/close calls appeared
+     to do nothing. Force the exact dialog visible without leaving Household OS. */
+  var originalOpenText=window.openTextModal;
+  if(typeof originalOpenText==='function'){
+    window.openTextModal=function(){
+      var result=originalOpenText.apply(this,arguments);
+      showExternalModal('textModal');
+      return result;
+    };
+  }
+  window.closeTextModal=function(){
+    hideExternalModal('textModal');
+    window.textModalCallback=null;
+  };
+
+  var originalConfirmRespond=window.confirmModalRespond;
+  var originalOpenConfirm=window.openConfirmModal;
+  if(typeof originalOpenConfirm==='function'){
+    window.openConfirmModal=function(){
+      var result=originalOpenConfirm.apply(this,arguments);
+      showExternalModal('confirmModal');
+      return result;
+    };
+  }
+  if(typeof originalConfirmRespond==='function'){
+    window.confirmModalRespond=function(){
+      var result=originalConfirmRespond.apply(this,arguments);
+      hideExternalModal('confirmModal');
+      return result;
+    };
+  }
+
+  var originalShowInfo=window.showInfo;
+  if(typeof originalShowInfo==='function'){
+    window.showInfo=function(){
+      var result=originalShowInfo.apply(this,arguments);
+      showExternalModal('infoModal');
+      return result;
+    };
+  }
+  var originalCloseInfo=window.closeInfoModal;
+  window.closeInfoModal=function(){
+    if(typeof originalCloseInfo==='function')originalCloseInfo();
+    hideExternalModal('infoModal');
+  };
+
+  /* Add Location now uses the existing location workflow, but makes its dialog
+     visible above the Household OS shell. */
+  window.osAddLocationQuick=function(){
+    if(typeof addLocation==='function'){
+      addLocation();
+      setTimeout(function(){
+        showExternalModal('textModal');
+      },0);
+      return;
+    }
+    var name=prompt('New location name');
+    if(!name)return;
+    name=name.trim();
+    if(!name)return;
+    try{
+      if(typeof LOCATIONS!=='undefined' && Array.isArray(LOCATIONS)){
+        if(!LOCATIONS.some(function(l){return String(l).toLowerCase()===name.toLowerCase();})){
+          var otherIdx=LOCATIONS.indexOf('Other');
+          if(otherIdx>-1)LOCATIONS.splice(otherIdx,0,name); else LOCATIONS.push(name);
+          if(typeof saveLocations==='function')saveLocations();
+        }
+      }
+    }catch(e){}
+    if(typeof osRenderLocations==='function')osRenderLocations();
+  };
+
+  /* Manage Photos & Locations should stay inside the current Household OS
+     experience instead of switching to the hidden legacy page. */
+  window.osOpenLegacyLocationManager=function(){
+    if(typeof renderLocationsList==='function')renderLocationsList();
+    showExternalModal('locationsModal');
+  };
+  window.closeManageLocations=function(){
+    hideExternalModal('locationsModal');
+    if(typeof osRenderLocations==='function')osRenderLocations();
+  };
+
+  /* Location photo input remains usable even though it lives outside #os-shell. */
+  var originalPickLocationPhoto=window.pickLocationPhoto;
+  if(typeof originalPickLocationPhoto==='function'){
+    window.pickLocationPhoto=function(loc){
+      originalPickLocationPhoto(loc);
+    };
+  }
+
+  /* Re-wire the visible Location 2.0 buttons in case earlier build handlers
+     were cached or replaced. */
+  function wire(){
+    var panel=document.getElementById('os-locations-panel');
+    if(!panel)return;
+    panel.querySelectorAll('button').forEach(function(btn){
+      var t=btn.textContent.trim();
+      if(t.indexOf('Add Location')!==-1)btn.onclick=window.osAddLocationQuick;
+      if(t.indexOf('Manage Photos & Locations')!==-1)btn.onclick=window.osOpenLegacyLocationManager;
+    });
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){setTimeout(wire,500);});
+  }else{
+    setTimeout(wire,500);
   }
 })();
 </script>
