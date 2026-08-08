@@ -1174,6 +1174,7 @@
     <div id="batchScanPanel" class="hidden" style="margin-top:10px;">
       <div id="batchScanCount" style="text-align:center;font-weight:700;font-size:0.85rem;margin-bottom:6px;">0 items scanned</div>
       <div id="batchScanList" style="max-height:130px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;"></div>
+      <button type="button" class="btn-secondary" style="width:100%;margin-top:8px;font-size:0.8rem;" onclick="forceAlternateScanner()">🔄 Not recognizing this barcode? Try backup scanner</button>
     </div>
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" id="scannerCancelBtn" onclick="closeScanner()">Cancel</button>
@@ -2867,7 +2868,7 @@ function closeScanner(){
 function startNativeDetector(video){
   let detector;
   try{
-    detector = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','qr_code']});
+    detector = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf','codabar','qr_code']});
   }catch(e){
     startZXingFallback(video);
     return;
@@ -2898,6 +2899,21 @@ function startNativeDetector(video){
     scannerRAF = requestAnimationFrame(scanLoop);
   };
   scanLoop();
+}
+
+// Manual override: if the native detector's underlying platform doesn't
+// actually decode a format it claims to support (this varies a lot by
+// browser/OS, especially for Code 39/ITF/Codabar), it just never finds
+// anything — silently, with no error to react to automatically. Rather
+// than guess at a fragile auto-switch timer, this lets the person force
+// the switch themselves, on the same still-running camera stream.
+function forceAlternateScanner(){
+  if(scannerRAF){ cancelAnimationFrame(scannerRAF); scannerRAF = null; }
+  if(zxingReader){ try{ zxingReader.reset(); }catch(e){} zxingReader = null; }
+  const video = document.getElementById('scannerVideo');
+  if(!video || !scannerStream) return;
+  setScannerStatus('Switching to backup scanner…');
+  startZXingFallback(video);
 }
 
 function startZXingFallback(video){
@@ -2949,7 +2965,10 @@ async function handleScanResult(code){
     // waiting on the network lookup (see below), each of those misreads
     // was free to fire immediately — enough of them piling up at once was
     // enough to freeze the whole page, including the Cancel/Done buttons.
-    if(!/^\d{6,14}$/.test(code)) return;
+    // UPC/EAN codes are purely numeric, but Code 39/Codabar (used on some
+    // wholesale and store-brand packaging) can include letters and a
+    // handful of symbol characters, so this can't be digits-only.
+    if(!/^[A-Z0-9\-.$/+%: ]{4,20}$/i.test(code)) return;
 
     const now = Date.now();
     if(code === lastBatchCode && (now - lastBatchTime) < 2500){
@@ -3045,7 +3064,10 @@ function updateBatchScanUI(){
   if(listEl){
     listEl.innerHTML = batchScanQueue.map(b=>{
       const icon = b.found ? '✅' : (b.likelyNonFood ? '🧴' : '❔');
-      return `<div style="font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border);">${icon} ${escapeHtml(b.name)}${b.qty>1?' ×'+b.qty:''}</div>`;
+      const label = (!b.found && b.likelyNonFood)
+        ? `Barcode captured — not in food database, will need a name (${escapeHtml(b.name)})`
+        : `${escapeHtml(b.name)}${b.qty>1?' ×'+b.qty:''}`;
+      return `<div style="font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border);">${icon} ${label}</div>`;
     }).join('');
   }
 }
