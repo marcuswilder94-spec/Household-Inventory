@@ -8409,128 +8409,218 @@ body.os-location-confirm-open #confirmModal button{
 })();
 </script>
 
+<style id="household-os-build035-deep-scanner-stability-styles">
+/* Build 035 — one scanner controller, no global touch interception. */
+body.os-scanner-open{
+  overflow:hidden !important;
+}
 
-
-<style id="household-os-build032-bulk-scanner-styles">
-/* Build 033: scanner controls always stay tappable above the camera layer/navigation. */
 #scannerModal{
-  z-index:6000 !important;
-  touch-action:manipulation;
+  z-index:12000 !important;
+  overscroll-behavior:contain;
 }
 #scannerModal.hidden{
   display:none !important;
+  visibility:hidden !important;
   pointer-events:none !important;
 }
 #scannerModal:not(.hidden){
   display:flex !important;
+  visibility:visible !important;
   pointer-events:auto !important;
 }
-#scannerModal .modal-box,
-#scannerModal .modal-btns,
-#scannerModal button{
+#scannerModal .modal-box{
   position:relative;
+  z-index:12001;
   pointer-events:auto !important;
-  touch-action:manipulation;
+  max-height:92dvh;
+  overflow:auto;
+}
+#scannerModal video{
+  pointer-events:none !important;
 }
 #scannerModal .modal-btns{
   position:sticky;
   bottom:0;
-  z-index:6002;
+  z-index:12010 !important;
   background:#fff;
-  padding-top:10px;
+  padding:12px 0 max(12px, env(safe-area-inset-bottom));
+  pointer-events:auto !important;
+}
+#scannerCancelBtn,
+#scannerDoneBtn{
+  position:relative;
+  z-index:12011 !important;
+  min-height:50px;
+  pointer-events:auto !important;
+  touch-action:manipulation;
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+/* General prompt safety: hidden overlays can never steal taps. */
+.modal-overlay.hidden{
+  pointer-events:none !important;
+  visibility:hidden !important;
+}
+.modal-overlay:not(.hidden){
+  pointer-events:auto !important;
+}
+.modal-overlay:not(.hidden) .modal-box,
+.modal-overlay:not(.hidden) button,
+.modal-overlay:not(.hidden) input,
+.modal-overlay:not(.hidden) select,
+.modal-overlay:not(.hidden) textarea{
+  pointer-events:auto !important;
 }
 </style>
 
-<script id="household-os-build032-bulk-scanner-engine">
+<script id="household-os-build035-deep-scanner-stability-engine">
 (function(){
-  let scanSessionId=0;
-  let backgroundLookups=new Map();
+  let scannerLoopTimer = null;
+  let scannerEnding = false;
+  let lookupControllers = new Map();
 
-  function scannerIsOpen(){
-    const modal=document.getElementById('scannerModal');
-    return !!(modal && !modal.classList.contains('hidden'));
+  function scannerModalEl(){
+    return document.getElementById('scannerModal');
   }
 
-  function hardCloseScanner(){
-    scanSessionId++;
+  function scannerIsVisible(){
+    const m=scannerModalEl();
+    return !!(m && !m.classList.contains('hidden'));
+  }
 
-    const modal=document.getElementById('scannerModal');
-    if(modal){
-      modal.classList.add('hidden');
-      modal.style.setProperty('display','none','important');
-      modal.style.setProperty('pointer-events','none','important');
-    }
+  function markScannerOpen(){
+    document.body.classList.add('os-scanner-open');
+    const m=scannerModalEl();
+    if(!m)return;
+    m.classList.remove('hidden');
+    m.style.removeProperty('display');
+    m.style.removeProperty('visibility');
+    m.style.removeProperty('pointer-events');
+  }
 
-    if(window.scannerRAF){
-      try{cancelAnimationFrame(window.scannerRAF);}catch(e){}
-      window.scannerRAF=null;
+  function stopScannerEngine(){
+    scannerEnding=true;
+
+    if(scannerLoopTimer){
+      clearTimeout(scannerLoopTimer);
+      scannerLoopTimer=null;
     }
 
     try{
-      if(window.zxingReader && typeof window.zxingReader.reset==='function'){
-        window.zxingReader.reset();
+      if(scannerRAF){
+        cancelAnimationFrame(scannerRAF);
+        scannerRAF=null;
       }
     }catch(e){}
-    window.zxingReader=null;
 
     try{
-      if(window.scannerStream){
-        window.scannerStream.getTracks().forEach(t=>t.stop());
+      if(zxingReader && typeof zxingReader.reset==='function'){
+        zxingReader.reset();
+      }
+      zxingReader=null;
+    }catch(e){}
+
+    try{
+      if(scannerStream){
+        scannerStream.getTracks().forEach(function(t){
+          try{t.stop();}catch(e){}
+        });
+        scannerStream=null;
       }
     }catch(e){}
-    window.scannerStream=null;
 
     const video=document.getElementById('scannerVideo');
     if(video){
       try{video.pause();}catch(e){}
-      video.srcObject=null;
+      try{video.srcObject=null;}catch(e){}
     }
   }
 
-  /* Replace close with an authoritative, synchronous close path. */
-  window.closeScanner=hardCloseScanner;
+  function hideScannerOnly(){
+    document.body.classList.remove('os-scanner-open');
+    const m=scannerModalEl();
+    if(m){
+      m.classList.add('hidden');
+      m.style.removeProperty('display');
+      m.style.removeProperty('visibility');
+      m.style.removeProperty('pointer-events');
+    }
+  }
 
-  function enrichEntryInBackground(entry, sessionAtStart){
-    if(!entry || !entry.barcode || backgroundLookups.has(entry.barcode))return;
-    const p=(async()=>{
+  closeScanner = function(){
+    stopScannerEngine();
+    hideScannerOnly();
+  };
+  window.closeScanner=closeScanner;
+
+  finishBatchScan = function(){
+    if(scannerEnding)return;
+    const count=Array.isArray(batchScanQueue)?batchScanQueue.length:0;
+
+    stopScannerEngine();
+    hideScannerOnly();
+
+    if(count===0){
+      if(typeof showInfo==='function')showInfo('No barcodes were scanned.','ℹ️');
+      scannerEnding=false;
+      return;
+    }
+
+    /* Let iOS release the camera compositor before opening the review modal. */
+    setTimeout(function(){
       try{
-        const controller=('AbortController' in window)?new AbortController():null;
-        const timer=controller?setTimeout(()=>controller.abort(),4500):null;
-        const res=await fetch(
-          'https://world.openfoodfacts.org/api/v0/product/'+encodeURIComponent(entry.barcode)+'.json',
-          controller?{signal:controller.signal}:undefined
-        );
-        if(timer)clearTimeout(timer);
-        const data=await res.json();
-        if(data.status===1 && data.product && data.product.product_name){
+        showBatchScanReview();
+        const review=document.getElementById('batchReviewModal');
+        if(review){
+          review.classList.remove('hidden');
+          review.style.setProperty('z-index','12100','important');
+        }
+      }finally{
+        scannerEnding=false;
+      }
+    },90);
+  };
+  window.finishBatchScan=finishBatchScan;
+
+  function enrichBatchEntry(entry){
+    if(!entry || !entry.barcode || lookupControllers.has(entry.barcode))return;
+
+    const controller=('AbortController' in window)?new AbortController():null;
+    lookupControllers.set(entry.barcode,controller||true);
+
+    const timer=controller?setTimeout(function(){
+      try{controller.abort();}catch(e){}
+    },3500):null;
+
+    fetch('https://world.openfoodfacts.org/api/v0/product/'+encodeURIComponent(entry.barcode)+'.json',
+      controller?{signal:controller.signal}:undefined)
+      .then(function(res){return res.json();})
+      .then(function(data){
+        if(data && data.status===1 && data.product && data.product.product_name){
           entry.name=data.product.product_name;
-          if(typeof cleanCategoryFromOFF==='function'){
-            entry.category=cleanCategoryFromOFF(data.product)||'';
-          }
+          try{entry.category=cleanCategoryFromOFF(data.product)||'';}catch(e){}
           const img=data.product.image_front_url||data.product.image_front_small_url;
           if(img)entry.photo=img;
           entry.found=true;
+          if(scannerIsVisible() && typeof updateBatchScanUI==='function'){
+            updateBatchScanUI();
+          }
         }
-      }catch(e){
-        // Network/product lookup must never block the camera.
-      }finally{
-        backgroundLookups.delete(entry.barcode);
-        if(typeof updateBatchScanUI==='function' && scannerIsOpen()){
-          try{updateBatchScanUI();}catch(e){}
-        }
-      }
-    })();
-    backgroundLookups.set(entry.barcode,p);
+      })
+      .catch(function(){})
+      .finally(function(){
+        if(timer)clearTimeout(timer);
+        lookupControllers.delete(entry.barcode);
+      });
   }
 
-  /* Critical scanner change:
-     record the barcode immediately and do product lookup asynchronously.
-     The old flow awaited Open Food Facts before allowing the next scan. */
-  window.addToBatchQueue=function(code){
+  addToBatchQueue = function(code){
     code=String(code||'').trim();
     if(!code)return;
 
-    const existing=batchScanQueue.find(b=>b.barcode===code);
+    const existing=batchScanQueue.find(function(b){return b.barcode===code;});
     if(existing){
       existing.qty+=1;
       updateBatchScanUI();
@@ -8547,658 +8637,225 @@ body.os-location-confirm-open #confirmModal button{
     };
     batchScanQueue.push(entry);
     updateBatchScanUI();
-    enrichEntryInBackground(entry,scanSessionId);
-  };
 
-  window.handleScanResult=function(code){
+    /* Product lookup is deliberately background-only. */
+    enrichBatchEntry(entry);
+  };
+  window.addToBatchQueue=addToBatchQueue;
+
+  handleScanResult = async function(code){
     code=String(code||'').trim();
-    if(!code)return;
+    if(!code || scannerEnding)return;
 
     if(scanContext==='batch'){
       const now=Date.now();
-      if(code===lastBatchCode && (now-lastBatchTime)<1800){
-        return;
-      }
+      if(code===lastBatchCode && (now-lastBatchTime)<1800)return;
       lastBatchCode=code;
       lastBatchTime=now;
 
-      // Do NOT await internet lookup. Camera is immediately free for the next barcode.
-      window.addToBatchQueue(code);
-      if(typeof setScannerStatus==='function'){
-        setScannerStatus('Scanned '+batchScanQueue.length+' item'+(batchScanQueue.length===1?'':'s')+' — ready for next barcode');
-      }
+      addToBatchQueue(code);
+      setScannerStatus(
+        'Scanned '+batchScanQueue.length+
+        ' item'+(batchScanQueue.length===1?'':'s')+
+        ' — ready for next barcode'
+      );
       return;
     }
 
     if(scanHandled)return;
     scanHandled=true;
-    hardCloseScanner();
+    closeScanner();
 
-    (async()=>{
-      if(scanContext==='edit'){
-        document.getElementById('e-barcode').value=code;
-        if(typeof lookupProductByBarcodeForEdit==='function')await lookupProductByBarcodeForEdit(code);
-        return;
-      }
+    if(scanContext==='edit'){
+      document.getElementById('e-barcode').value=code;
+      await lookupProductByBarcodeForEdit(code);
+      return;
+    }
 
-      document.getElementById('f-barcode').value=code;
-      const existing=inventory.find(i=>i.barcode===code);
-      if(existing){
-        openConfirmModal('This is already in your inventory as "'+existing.name+'". Add 1 to the quantity instead of creating a duplicate?',function(ok){
+    document.getElementById('f-barcode').value=code;
+    const existing=inventory.find(function(i){return i.barcode===code;});
+    if(existing){
+      openConfirmModal(
+        'This is already in your inventory as "'+existing.name+
+        '". Add 1 to the quantity instead of creating a duplicate?',
+        function(ok){
           if(ok){
             changeQty(existing.id,1);
             switchTab('inventory');
           }
-        });
-        return;
-      }
-      if(typeof lookupProductByBarcode==='function')await lookupProductByBarcode(code);
-    })();
+        }
+      );
+      return;
+    }
+    await lookupProductByBarcode(code);
   };
+  window.handleScanResult=handleScanResult;
 
-  /* Rebuild the native detector loop so it never waits for product lookup. */
-  window.startNativeDetector=function(video){
+  /* Native detector: intentionally paced. The old requestAnimationFrame loop
+     could run detection as fast as Safari allowed, starving UI taps. */
+  startNativeDetector = function(video){
     let detector;
     try{
-      detector=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','qr_code']});
+      detector=new BarcodeDetector({
+        formats:['ean_13','ean_8','upc_a','upc_e','code_128','qr_code']
+      });
     }catch(e){
       startZXingFallback(video);
       return;
     }
 
-    setScannerStatus(scanContext==='batch'?'Ready — scan as many barcodes as you like':'Ready — point at a barcode');
-    let errors=0;
-    const session=++scanSessionId;
+    scannerEnding=false;
+    setScannerStatus(
+      scanContext==='batch'
+        ? 'Ready — scan as many barcodes as you like'
+        : 'Ready — point at a barcode'
+    );
 
-    const loop=async()=>{
-      if(session!==scanSessionId || !scannerStream || !scannerIsOpen())return;
+    let consecutiveErrors=0;
+
+    const schedule=function(delay){
+      if(scannerEnding || !scannerStream || !scannerIsVisible())return;
+      scannerLoopTimer=setTimeout(function(){
+        scannerRAF=requestAnimationFrame(scanLoop);
+      },delay);
+    };
+
+    const scanLoop=async function(){
+      if(scannerEnding || !scannerStream || !scannerIsVisible())return;
+
+      let found=false;
       try{
         const codes=await detector.detect(video);
-        errors=0;
+        consecutiveErrors=0;
         if(codes && codes.length){
-          window.handleScanResult(codes[0].rawValue);
+          found=true;
+          await handleScanResult(codes[0].rawValue);
         }
-      }catch(e){
-        errors++;
-        if(errors>5){
+      }catch(err){
+        consecutiveErrors++;
+        if(consecutiveErrors>5){
           startZXingFallback(video);
           return;
         }
       }
-      if(session===scanSessionId && scannerStream && scannerIsOpen()){
-        scannerRAF=requestAnimationFrame(loop);
-      }
+
+      /* 220 ms idle / 450 ms after a hit leaves the main thread available
+         for Done, Cancel, scrolling, and other controls. */
+      schedule(found?450:220);
     };
-    loop();
+
+    schedule(120);
   };
+  window.startNativeDetector=startNativeDetector;
 
-  /* ZXing fallback also restarts immediately after capture instead of waiting
-     for a remote product lookup. */
-  window.runZXing=function(video){
-    const session=++scanSessionId;
+  /* ZXing fallback: one decode at a time with a short breathing gap. */
+  runZXing = function(video){
+    scannerEnding=false;
 
-    const scanNext=()=>{
-      if(session!==scanSessionId || !scannerStream || !scannerIsOpen())return;
+    const scanNext=function(){
+      if(scannerEnding || !scannerStream || !scannerIsVisible())return;
       try{
         zxingReader=new ZXingBrowser.BrowserMultiFormatReader();
-        setScannerStatus(scanContext==='batch'?'Ready — scan as many barcodes as you like':'Ready — point at a barcode');
-        zxingReader.decodeOnceFromVideoElement(video).then(function(result){
-          if(session!==scanSessionId || !scannerIsOpen())return;
-          if(result){
-            window.handleScanResult(result.getText());
-            if(scanContext==='batch' && scannerStream){
-              setTimeout(scanNext,80);
+        setScannerStatus(
+          scanContext==='batch'
+            ? 'Ready — scan as many barcodes as you like'
+            : 'Ready — point at a barcode'
+        );
+        zxingReader.decodeOnceFromVideoElement(video)
+          .then(async function(result){
+            if(scannerEnding || !scannerIsVisible())return;
+            if(result){
+              await handleScanResult(result.getText());
+              if(scanContext==='batch' && scannerStream && !scannerEnding){
+                scannerLoopTimer=setTimeout(scanNext,350);
+              }
             }
-          }
-        }).catch(function(){});
+          })
+          .catch(function(){});
       }catch(e){
         setScannerStatus('The barcode scanner could not start on this device — close it and try again, or type the barcode manually.');
       }
     };
+
     scanNext();
   };
+  window.runZXing=runZXing;
+
+  /* Keep the original camera-opening code, but control state before/after it. */
+  const originalOpenScanner=openScanner;
+  openScanner=async function(context){
+    scannerEnding=false;
+    markScannerOpen();
+    try{
+      const result=await originalOpenScanner.apply(this,arguments);
+      markScannerOpen();
+      wireScannerButtons();
+      return result;
+    }catch(err){
+      markScannerOpen();
+      wireScannerButtons();
+      throw err;
+    }
+  };
+  window.openScanner=openScanner;
 
   function wireScannerButtons(){
     const cancel=document.getElementById('scannerCancelBtn');
     const done=document.getElementById('scannerDoneBtn');
 
-    if(cancel && cancel.dataset.osBuild032!=='1'){
-      const c=cancel.cloneNode(true);
-      c.dataset.osBuild032='1';
-      c.removeAttribute('onclick');
-      cancel.replaceWith(c);
-      const cancelAction=e=>{
-        e.preventDefault();e.stopPropagation();hardCloseScanner();
-      };
-      c.addEventListener('click',cancelAction,{passive:false});
-      c.addEventListener('touchend',cancelAction,{passive:false});
-    }
-
-    const currentDone=document.getElementById('scannerDoneBtn');
-    if(currentDone && currentDone.dataset.osBuild032!=='1'){
-      const d=currentDone.cloneNode(true);
-      d.dataset.osBuild032='1';
-      d.removeAttribute('onclick');
-      currentDone.replaceWith(d);
-      const doneAction=e=>{
-        e.preventDefault();e.stopPropagation();
-        hardCloseScanner();
-        if(batchScanQueue.length===0){
-          if(typeof showInfo==='function')showInfo('No barcodes were scanned.','ℹ️');
-          return;
-        }
-        if(typeof showBatchScanReview==='function')showBatchScanReview();
-      };
-      d.addEventListener('click',doneAction,{passive:false});
-      d.addEventListener('touchend',doneAction,{passive:false});
-    }
-  }
-
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',()=>setTimeout(wireScannerButtons,950));
-  }else{
-    setTimeout(wireScannerButtons,950);
-  }
-})();
-</script>
-
-
-
-<style id="household-os-build033-scanner-touch-fix-styles">
-/* Build 033: scanner owns the screen while active; background must not receive taps/scrolls. */
-body.os-scanner-open{
-  overflow:hidden !important;
-  touch-action:none;
-}
-body.os-scanner-open #scannerModal{
-  display:flex !important;
-  visibility:visible !important;
-  pointer-events:auto !important;
-  z-index:9000 !important;
-}
-body.os-scanner-open #scannerModal .modal-box,
-body.os-scanner-open #scannerModal .modal-btns,
-body.os-scanner-open #scannerModal button{
-  pointer-events:auto !important;
-  touch-action:manipulation !important;
-}
-body.os-scanner-open #scannerCancelBtn,
-body.os-scanner-open #scannerDoneBtn{
-  position:relative;
-  z-index:9002 !important;
-}
-</style>
-
-<script id="household-os-build033-scanner-touch-fix-engine">
-(function(){
-  let scannerScrollY=0;
-
-  function modal(){ return document.getElementById('scannerModal'); }
-  function cancelBtn(){ return document.getElementById('scannerCancelBtn'); }
-  function doneBtn(){ return document.getElementById('scannerDoneBtn'); }
-
-  function scannerOpen(){
-    const m=modal();
-    return !!(m && !m.classList.contains('hidden'));
-  }
-
-  function prepareScannerModal(){
-    const m=modal();
-    if(!m)return;
-
-    /* Earlier builds sometimes left inline !important styles behind.
-       Remove them every time the scanner opens so CSS can correctly own state. */
-    m.style.removeProperty('display');
-    m.style.removeProperty('pointer-events');
-    m.style.removeProperty('visibility');
-
-    m.classList.remove('hidden');
-    m.classList.remove('os-location-dialog-active');
-    m.style.setProperty('display','flex','important');
-    m.style.setProperty('pointer-events','auto','important');
-    m.style.setProperty('visibility','visible','important');
-
-    scannerScrollY=window.scrollY||0;
-    document.body.classList.add('os-scanner-open');
-  }
-
-  function releaseScannerScreen(){
-    document.body.classList.remove('os-scanner-open');
-    const m=modal();
-    if(m){
-      m.classList.add('hidden');
-      m.classList.remove('os-location-dialog-active');
-      m.style.setProperty('display','none','important');
-      m.style.setProperty('pointer-events','none','important');
-      m.style.setProperty('visibility','hidden','important');
-    }
-  }
-
-  function stopCameraOnly(){
-    try{
-      if(window.scannerRAF){
-        cancelAnimationFrame(window.scannerRAF);
-        window.scannerRAF=null;
-      }
-    }catch(e){}
-
-    try{
-      if(window.zxingReader && typeof window.zxingReader.reset==='function'){
-        window.zxingReader.reset();
-      }
-    }catch(e){}
-    window.zxingReader=null;
-
-    try{
-      if(window.scannerStream){
-        window.scannerStream.getTracks().forEach(t=>t.stop());
-      }
-    }catch(e){}
-    window.scannerStream=null;
-
-    const video=document.getElementById('scannerVideo');
-    if(video){
-      try{video.pause();}catch(e){}
-      video.srcObject=null;
-    }
-  }
-
-  function closeScanner033(){
-    stopCameraOnly();
-    releaseScannerScreen();
-  }
-
-  function doneScanner033(){
-    const queueCount=Array.isArray(window.batchScanQueue)?window.batchScanQueue.length:
-      (typeof batchScanQueue!=='undefined' && Array.isArray(batchScanQueue)?batchScanQueue.length:0);
-
-    stopCameraOnly();
-    releaseScannerScreen();
-
-    if(queueCount===0){
-      if(typeof showInfo==='function')showInfo('No barcodes were scanned.','ℹ️');
-      return;
-    }
-
-    if(typeof showBatchScanReview==='function'){
-      setTimeout(function(){
-        showBatchScanReview();
-        const review=document.getElementById('batchReviewModal');
-        if(review){
-          review.classList.remove('hidden');
-          review.style.setProperty('display','flex','important');
-          review.style.setProperty('pointer-events','auto','important');
-          review.style.setProperty('visibility','visible','important');
-          review.style.setProperty('z-index','9100','important');
-        }
-      },30);
-    }
-  }
-
-  window.closeScanner=closeScanner033;
-  window.finishBatchScan=doneScanner033;
-
-  /* Wrap the existing openScanner instead of replacing its camera logic.
-     The key is to reset modal state before and after camera startup. */
-  const previousOpenScanner=window.openScanner;
-  if(typeof previousOpenScanner==='function'){
-    window.openScanner=async function(context){
-      prepareScannerModal();
-      try{
-        const result=await previousOpenScanner.apply(this,arguments);
-        prepareScannerModal();
-        wireButtons();
-        return result;
-      }catch(err){
-        prepareScannerModal();
-        wireButtons();
-        throw err;
-      }
-    };
-  }
-
-  function pointInside(el,x,y){
-    if(!el || el.classList.contains('hidden'))return false;
-    const r=el.getBoundingClientRect();
-    return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
-  }
-
-  function interceptScannerAction(e){
-    if(!scannerOpen())return;
-
-    let x,y;
-    if(e.changedTouches && e.changedTouches.length){
-      x=e.changedTouches[0].clientX;
-      y=e.changedTouches[0].clientY;
-    }else{
-      x=e.clientX;
-      y=e.clientY;
-    }
-
-    const c=cancelBtn();
-    const d=doneBtn();
-
-    if(pointInside(c,x,y)){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      closeScanner033();
-      return;
-    }
-
-    if(pointInside(d,x,y)){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      doneScanner033();
-    }
-  }
-
-  function wireButtons(){
-    const c=cancelBtn();
-    const d=doneBtn();
-
-    if(c && c.dataset.osBuild033!=='1'){
-      c.dataset.osBuild033='1';
-      c.removeAttribute('onclick');
-      c.addEventListener('click',function(e){
-        e.preventDefault();e.stopPropagation();closeScanner033();
-      });
-    }
-
-    if(d && d.dataset.osBuild033!=='1'){
-      d.dataset.osBuild033='1';
-      d.removeAttribute('onclick');
-      d.addEventListener('click',function(e){
-        e.preventDefault();e.stopPropagation();doneScanner033();
-      });
-    }
-  }
-
-  /* Capture-phase fallback:
-     even if Safari incorrectly sends the touch to the page behind the modal,
-     use the finger coordinates to execute the scanner button the user touched. */
-  document.addEventListener('touchend',interceptScannerAction,true);
-  document.addEventListener('pointerup',interceptScannerAction,true);
-
-  /* While scanner is visible, prevent page-behind scrolling without blocking
-     touches that begin on the scanner buttons. */
-  document.addEventListener('touchmove',function(e){
-    if(!scannerOpen())return;
-    e.preventDefault();
-  },{capture:true,passive:false});
-
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',function(){setTimeout(wireButtons,1000);});
-  }else{
-    setTimeout(wireButtons,1000);
-  }
-})();
-</script>
-
-
-<style id="household-os-build034-global-interaction-stability-styles">
-/* Build 034 — global tap/modal stability
-   Keep only the currently visible prompt interactive and keep its controls
-   above camera/video/content layers. */
-.modal-overlay,
-.os-modal-screen,
-.os-batch-modal,
-.os-loc-modal{
-  isolation:isolate;
-}
-.modal-overlay.hidden,
-.os-modal-screen.hidden,
-.os-batch-modal.hidden,
-.os-loc-modal.hidden{
-  pointer-events:none !important;
-  visibility:hidden !important;
-}
-.modal-overlay:not(.hidden),
-.os-modal-screen:not(.hidden),
-.os-batch-modal:not(.hidden),
-.os-loc-modal:not(.hidden){
-  pointer-events:auto !important;
-}
-.modal-overlay:not(.hidden) .modal-box,
-.os-modal-screen:not(.hidden) .os-modal-card,
-.os-batch-modal:not(.hidden) .os-batch-card,
-.os-loc-modal:not(.hidden) .os-loc-modal-card{
-  position:relative;
-  pointer-events:auto !important;
-}
-.modal-overlay:not(.hidden) button,
-.os-modal-screen:not(.hidden) button,
-.os-batch-modal:not(.hidden) button,
-.os-loc-modal:not(.hidden) button{
-  pointer-events:auto !important;
-  touch-action:manipulation !important;
-  -webkit-tap-highlight-color:rgba(0,0,0,.08);
-}
-
-/* The scanner is the top-most interaction surface while open. */
-body.os-scanner-open{
-  overflow:hidden !important;
-  touch-action:auto !important;
-}
-body.os-scanner-open #scannerModal{
-  z-index:12000 !important;
-}
-body.os-scanner-open #scannerModal .modal-box{
-  z-index:12001 !important;
-}
-body.os-scanner-open #scannerModal .modal-btns{
-  position:sticky !important;
-  bottom:0 !important;
-  z-index:12005 !important;
-  pointer-events:auto !important;
-  background:#fff !important;
-  padding:10px 0 max(10px, env(safe-area-inset-bottom)) !important;
-}
-body.os-scanner-open #scannerCancelBtn,
-body.os-scanner-open #scannerDoneBtn{
-  z-index:12006 !important;
-  min-height:48px;
-  pointer-events:auto !important;
-  touch-action:manipulation !important;
-}
-</style>
-
-<script id="household-os-build034-global-interaction-stability-engine">
-(function(){
-  /* IMPORTANT:
-     The original scanner state was declared with top-level `let`, so later
-     fixes that used window.scannerStream/window.scannerRAF did not stop the
-     real scanner. Build 034 deliberately references the original lexical
-     variables directly. */
-  function stopRealScanner(){
-    try{
-      if(typeof scannerRAF !== 'undefined' && scannerRAF){
-        cancelAnimationFrame(scannerRAF);
-        scannerRAF = null;
-      }
-    }catch(e){}
-
-    try{
-      if(typeof zxingReader !== 'undefined' && zxingReader){
-        if(typeof zxingReader.reset === 'function') zxingReader.reset();
-        zxingReader = null;
-      }
-    }catch(e){}
-
-    try{
-      if(typeof scannerStream !== 'undefined' && scannerStream){
-        scannerStream.getTracks().forEach(function(track){
-          try{ track.stop(); }catch(e){}
-        });
-        scannerStream = null;
-      }
-    }catch(e){}
-
-    const video=document.getElementById('scannerVideo');
-    if(video){
-      try{ video.pause(); }catch(e){}
-      try{ video.srcObject=null; }catch(e){}
-    }
-  }
-
-  function hideScanner(){
-    stopRealScanner();
-    document.body.classList.remove('os-scanner-open');
-    const modal=document.getElementById('scannerModal');
-    if(modal){
-      modal.classList.add('hidden');
-      modal.style.setProperty('display','none','important');
-      modal.style.setProperty('visibility','hidden','important');
-      modal.style.setProperty('pointer-events','none','important');
-    }
-  }
-
-  function finishScanner(){
-    const count=(typeof batchScanQueue !== 'undefined' && Array.isArray(batchScanQueue))
-      ? batchScanQueue.length : 0;
-
-    hideScanner();
-
-    if(count===0){
-      if(typeof showInfo==='function') showInfo('No barcodes were scanned.','ℹ️');
-      return;
-    }
-
-    /* Yield one frame so iOS fully releases the camera layer before opening
-       the review prompt. */
-    requestAnimationFrame(function(){
-      if(typeof showBatchScanReview==='function'){
-        showBatchScanReview();
-        const review=document.getElementById('batchReviewModal');
-        if(review){
-          review.classList.remove('hidden');
-          review.style.setProperty('display','flex','important');
-          review.style.setProperty('visibility','visible','important');
-          review.style.setProperty('pointer-events','auto','important');
-          review.style.setProperty('z-index','12100','important');
-        }
-      }
-    });
-  }
-
-  window.closeScanner = hideScanner;
-  window.finishBatchScan = finishScanner;
-
-  function scannerVisible(){
-    const m=document.getElementById('scannerModal');
-    return !!(m && !m.classList.contains('hidden'));
-  }
-
-  /* Use pointerdown instead of waiting for click/touchend. This makes Done and
-     Cancel react before another barcode-detection cycle or legacy touch
-     handler can consume the gesture. */
-  function wireScannerControls(){
-    const cancel=document.getElementById('scannerCancelBtn');
-    const done=document.getElementById('scannerDoneBtn');
-
-    if(cancel && cancel.dataset.osBuild034!=='1'){
-      cancel.dataset.osBuild034='1';
+    if(cancel && cancel.dataset.osBuild035!=='1'){
+      cancel.dataset.osBuild035='1';
       cancel.removeAttribute('onclick');
-      cancel.addEventListener('pointerdown',function(e){
-        if(!scannerVisible())return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        hideScanner();
-      },true);
-      cancel.addEventListener('click',function(e){
-        e.preventDefault(); e.stopImmediatePropagation();
-      },true);
+      cancel.onclick=function(e){
+        if(e){e.preventDefault();e.stopPropagation();}
+        closeScanner();
+        return false;
+      };
     }
 
-    if(done && done.dataset.osBuild034!=='1'){
-      done.dataset.osBuild034='1';
+    if(done && done.dataset.osBuild035!=='1'){
+      done.dataset.osBuild035='1';
       done.removeAttribute('onclick');
-      done.addEventListener('pointerdown',function(e){
-        if(!scannerVisible())return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        finishScanner();
-      },true);
-      done.addEventListener('click',function(e){
-        e.preventDefault(); e.stopImmediatePropagation();
-      },true);
+      done.onclick=function(e){
+        if(e){e.preventDefault();e.stopPropagation();}
+        finishBatchScan();
+        return false;
+      };
     }
   }
 
-  /* General modal cleanup. Old builds can leave inline display/pointer-event
-     rules behind. Whenever a prompt becomes hidden, make that state final. */
-  function normalizeModal(el){
-    if(!el)return;
-    if(el.classList.contains('hidden')){
-      el.style.setProperty('display','none','important');
-      el.style.setProperty('visibility','hidden','important');
-      el.style.setProperty('pointer-events','none','important');
-      return;
-    }
-    el.style.setProperty('visibility','visible','important');
-    el.style.setProperty('pointer-events','auto','important');
+  /* Modal stacking without intercepting touch/pointer events globally. */
+  let topZ=12200;
+  const observed=new WeakSet();
+
+  function normalizeModal(m){
+    if(!m || observed.has(m))return;
+    observed.add(m);
+
+    new MutationObserver(function(){
+      if(m.classList.contains('hidden')){
+        m.style.removeProperty('z-index');
+        return;
+      }
+      m.style.setProperty('z-index',String(++topZ),'important');
+    }).observe(m,{attributes:true,attributeFilter:['class']});
   }
 
-  function watchPrompts(){
-    const selectors=[
-      '.modal-overlay',
-      '.os-modal-screen',
-      '.os-batch-modal',
-      '.os-loc-modal'
-    ];
-    document.querySelectorAll(selectors.join(',')).forEach(function(el){
-      if(el.dataset.osBuild034Watch==='1')return;
-      el.dataset.osBuild034Watch='1';
-      normalizeModal(el);
-      new MutationObserver(function(){ normalizeModal(el); })
-        .observe(el,{attributes:true,attributeFilter:['class']});
-    });
+  function scanModals(){
+    document.querySelectorAll('.modal-overlay').forEach(normalizeModal);
+    wireScannerButtons();
   }
-
-  /* Bring the most recently opened prompt to the top. This prevents a hidden
-     or parent overlay from sitting over Yes/No/Close/Save controls. */
-  let modalZ=12200;
-  document.addEventListener('click',function(e){
-    const button=e.target.closest('button');
-    if(!button)return;
-    const prompt=button.closest('.modal-overlay,.os-modal-screen,.os-batch-modal,.os-loc-modal');
-    if(prompt && !prompt.classList.contains('hidden')){
-      prompt.style.setProperty('z-index',String(++modalZ),'important');
-    }
-  },true);
-
-  /* Escape remains a safe exit path for scanner on desktop testing. */
-  document.addEventListener('keydown',function(e){
-    if(e.key==='Escape' && scannerVisible()){
-      e.preventDefault();
-      hideScanner();
-    }
-  },true);
 
   if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',function(){
-      wireScannerControls();
-      watchPrompts();
-    });
+    document.addEventListener('DOMContentLoaded',scanModals);
   }else{
-    wireScannerControls();
-    watchPrompts();
+    scanModals();
   }
 
-  /* Some legacy render functions replace modal contents. Re-check cheaply
-     after DOM changes so replacement buttons are always wired. */
-  const root=document.body || document.documentElement;
-  if(root){
-    let scheduled=false;
-    new MutationObserver(function(){
-      if(scheduled)return;
-      scheduled=true;
-      requestAnimationFrame(function(){
-        scheduled=false;
-        wireScannerControls();
-        watchPrompts();
-      });
-    }).observe(root,{childList:true,subtree:true});
-  }
+  new MutationObserver(scanModals).observe(document.documentElement,{
+    childList:true,
+    subtree:true
+  });
 })();
 </script>
 
