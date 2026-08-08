@@ -8934,5 +8934,273 @@ body.os-scanner-open #scannerDoneBtn{
 })();
 </script>
 
+
+<style id="household-os-build034-global-interaction-stability-styles">
+/* Build 034 — global tap/modal stability
+   Keep only the currently visible prompt interactive and keep its controls
+   above camera/video/content layers. */
+.modal-overlay,
+.os-modal-screen,
+.os-batch-modal,
+.os-loc-modal{
+  isolation:isolate;
+}
+.modal-overlay.hidden,
+.os-modal-screen.hidden,
+.os-batch-modal.hidden,
+.os-loc-modal.hidden{
+  pointer-events:none !important;
+  visibility:hidden !important;
+}
+.modal-overlay:not(.hidden),
+.os-modal-screen:not(.hidden),
+.os-batch-modal:not(.hidden),
+.os-loc-modal:not(.hidden){
+  pointer-events:auto !important;
+}
+.modal-overlay:not(.hidden) .modal-box,
+.os-modal-screen:not(.hidden) .os-modal-card,
+.os-batch-modal:not(.hidden) .os-batch-card,
+.os-loc-modal:not(.hidden) .os-loc-modal-card{
+  position:relative;
+  pointer-events:auto !important;
+}
+.modal-overlay:not(.hidden) button,
+.os-modal-screen:not(.hidden) button,
+.os-batch-modal:not(.hidden) button,
+.os-loc-modal:not(.hidden) button{
+  pointer-events:auto !important;
+  touch-action:manipulation !important;
+  -webkit-tap-highlight-color:rgba(0,0,0,.08);
+}
+
+/* The scanner is the top-most interaction surface while open. */
+body.os-scanner-open{
+  overflow:hidden !important;
+  touch-action:auto !important;
+}
+body.os-scanner-open #scannerModal{
+  z-index:12000 !important;
+}
+body.os-scanner-open #scannerModal .modal-box{
+  z-index:12001 !important;
+}
+body.os-scanner-open #scannerModal .modal-btns{
+  position:sticky !important;
+  bottom:0 !important;
+  z-index:12005 !important;
+  pointer-events:auto !important;
+  background:#fff !important;
+  padding:10px 0 max(10px, env(safe-area-inset-bottom)) !important;
+}
+body.os-scanner-open #scannerCancelBtn,
+body.os-scanner-open #scannerDoneBtn{
+  z-index:12006 !important;
+  min-height:48px;
+  pointer-events:auto !important;
+  touch-action:manipulation !important;
+}
+</style>
+
+<script id="household-os-build034-global-interaction-stability-engine">
+(function(){
+  /* IMPORTANT:
+     The original scanner state was declared with top-level `let`, so later
+     fixes that used window.scannerStream/window.scannerRAF did not stop the
+     real scanner. Build 034 deliberately references the original lexical
+     variables directly. */
+  function stopRealScanner(){
+    try{
+      if(typeof scannerRAF !== 'undefined' && scannerRAF){
+        cancelAnimationFrame(scannerRAF);
+        scannerRAF = null;
+      }
+    }catch(e){}
+
+    try{
+      if(typeof zxingReader !== 'undefined' && zxingReader){
+        if(typeof zxingReader.reset === 'function') zxingReader.reset();
+        zxingReader = null;
+      }
+    }catch(e){}
+
+    try{
+      if(typeof scannerStream !== 'undefined' && scannerStream){
+        scannerStream.getTracks().forEach(function(track){
+          try{ track.stop(); }catch(e){}
+        });
+        scannerStream = null;
+      }
+    }catch(e){}
+
+    const video=document.getElementById('scannerVideo');
+    if(video){
+      try{ video.pause(); }catch(e){}
+      try{ video.srcObject=null; }catch(e){}
+    }
+  }
+
+  function hideScanner(){
+    stopRealScanner();
+    document.body.classList.remove('os-scanner-open');
+    const modal=document.getElementById('scannerModal');
+    if(modal){
+      modal.classList.add('hidden');
+      modal.style.setProperty('display','none','important');
+      modal.style.setProperty('visibility','hidden','important');
+      modal.style.setProperty('pointer-events','none','important');
+    }
+  }
+
+  function finishScanner(){
+    const count=(typeof batchScanQueue !== 'undefined' && Array.isArray(batchScanQueue))
+      ? batchScanQueue.length : 0;
+
+    hideScanner();
+
+    if(count===0){
+      if(typeof showInfo==='function') showInfo('No barcodes were scanned.','ℹ️');
+      return;
+    }
+
+    /* Yield one frame so iOS fully releases the camera layer before opening
+       the review prompt. */
+    requestAnimationFrame(function(){
+      if(typeof showBatchScanReview==='function'){
+        showBatchScanReview();
+        const review=document.getElementById('batchReviewModal');
+        if(review){
+          review.classList.remove('hidden');
+          review.style.setProperty('display','flex','important');
+          review.style.setProperty('visibility','visible','important');
+          review.style.setProperty('pointer-events','auto','important');
+          review.style.setProperty('z-index','12100','important');
+        }
+      }
+    });
+  }
+
+  window.closeScanner = hideScanner;
+  window.finishBatchScan = finishScanner;
+
+  function scannerVisible(){
+    const m=document.getElementById('scannerModal');
+    return !!(m && !m.classList.contains('hidden'));
+  }
+
+  /* Use pointerdown instead of waiting for click/touchend. This makes Done and
+     Cancel react before another barcode-detection cycle or legacy touch
+     handler can consume the gesture. */
+  function wireScannerControls(){
+    const cancel=document.getElementById('scannerCancelBtn');
+    const done=document.getElementById('scannerDoneBtn');
+
+    if(cancel && cancel.dataset.osBuild034!=='1'){
+      cancel.dataset.osBuild034='1';
+      cancel.removeAttribute('onclick');
+      cancel.addEventListener('pointerdown',function(e){
+        if(!scannerVisible())return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        hideScanner();
+      },true);
+      cancel.addEventListener('click',function(e){
+        e.preventDefault(); e.stopImmediatePropagation();
+      },true);
+    }
+
+    if(done && done.dataset.osBuild034!=='1'){
+      done.dataset.osBuild034='1';
+      done.removeAttribute('onclick');
+      done.addEventListener('pointerdown',function(e){
+        if(!scannerVisible())return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        finishScanner();
+      },true);
+      done.addEventListener('click',function(e){
+        e.preventDefault(); e.stopImmediatePropagation();
+      },true);
+    }
+  }
+
+  /* General modal cleanup. Old builds can leave inline display/pointer-event
+     rules behind. Whenever a prompt becomes hidden, make that state final. */
+  function normalizeModal(el){
+    if(!el)return;
+    if(el.classList.contains('hidden')){
+      el.style.setProperty('display','none','important');
+      el.style.setProperty('visibility','hidden','important');
+      el.style.setProperty('pointer-events','none','important');
+      return;
+    }
+    el.style.setProperty('visibility','visible','important');
+    el.style.setProperty('pointer-events','auto','important');
+  }
+
+  function watchPrompts(){
+    const selectors=[
+      '.modal-overlay',
+      '.os-modal-screen',
+      '.os-batch-modal',
+      '.os-loc-modal'
+    ];
+    document.querySelectorAll(selectors.join(',')).forEach(function(el){
+      if(el.dataset.osBuild034Watch==='1')return;
+      el.dataset.osBuild034Watch='1';
+      normalizeModal(el);
+      new MutationObserver(function(){ normalizeModal(el); })
+        .observe(el,{attributes:true,attributeFilter:['class']});
+    });
+  }
+
+  /* Bring the most recently opened prompt to the top. This prevents a hidden
+     or parent overlay from sitting over Yes/No/Close/Save controls. */
+  let modalZ=12200;
+  document.addEventListener('click',function(e){
+    const button=e.target.closest('button');
+    if(!button)return;
+    const prompt=button.closest('.modal-overlay,.os-modal-screen,.os-batch-modal,.os-loc-modal');
+    if(prompt && !prompt.classList.contains('hidden')){
+      prompt.style.setProperty('z-index',String(++modalZ),'important');
+    }
+  },true);
+
+  /* Escape remains a safe exit path for scanner on desktop testing. */
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape' && scannerVisible()){
+      e.preventDefault();
+      hideScanner();
+    }
+  },true);
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){
+      wireScannerControls();
+      watchPrompts();
+    });
+  }else{
+    wireScannerControls();
+    watchPrompts();
+  }
+
+  /* Some legacy render functions replace modal contents. Re-check cheaply
+     after DOM changes so replacement buttons are always wired. */
+  const root=document.body || document.documentElement;
+  if(root){
+    let scheduled=false;
+    new MutationObserver(function(){
+      if(scheduled)return;
+      scheduled=true;
+      requestAnimationFrame(function(){
+        scheduled=false;
+        wireScannerControls();
+        watchPrompts();
+      });
+    }).observe(root,{childList:true,subtree:true});
+  }
+})();
+</script>
+
 </body>
 </html>
