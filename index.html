@@ -2943,9 +2943,24 @@ function runZXing(video){
 
 async function handleScanResult(code){
   if(scanContext === 'batch'){
+    // Reject anything that doesn't look like a real product barcode.
+    // Under imperfect lighting/focus, decoders occasionally misread camera
+    // noise as a "code" many times per second. Once the scan loop stopped
+    // waiting on the network lookup (see below), each of those misreads
+    // was free to fire immediately — enough of them piling up at once was
+    // enough to freeze the whole page, including the Cancel/Done buttons.
+    if(!/^\d{6,14}$/.test(code)) return;
+
     const now = Date.now();
     if(code === lastBatchCode && (now - lastBatchTime) < 2500){
       return; // same barcode still in view — don't double-add
+    }
+    // Minimum gap between ANY two accepted scans, even different codes —
+    // real scanning involves physically repositioning the camera between
+    // items, which always takes longer than this. Blocks a burst of
+    // misreads from queuing up a pile of concurrent lookups.
+    if(now - lastBatchTime < 400){
+      return;
     }
     lastBatchCode = code;
     lastBatchTime = now;
