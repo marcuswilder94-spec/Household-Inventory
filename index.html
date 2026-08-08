@@ -1160,7 +1160,7 @@ font-size:23px;flex:0 0 auto}
 
 
 <style id="household-os-build023-location-visuals">
-/* Build 031: calmer Household OS home hero + location-specific visual headers */
+/* Build 032: calmer Household OS home hero + location-specific visual headers */
 .os-home-cover-023{
   position:relative;overflow:hidden;border-radius:22px;margin-bottom:16px;min-height:235px;
   background:
@@ -1483,7 +1483,7 @@ body.os-dark .os-location-edit-actions button{background:#0f172a;color:var(--os-
   </div>
 </section>
 
-<!-- Build 031 branding: Household OS | Your home. Organized. -->
+<!-- Build 032 branding: Household OS | Your home. Organized. -->
 <section id="os-settings-panel" class="os-settings-panel">
   <div class="os-inventory-head">
     <div><h2>Settings & Data</h2><div class="os-item-meta">Customize Household OS, set household defaults, and protect your data.</div></div>
@@ -6639,7 +6639,7 @@ initFirebaseApp();
 
   // Keep version display current.
   document.querySelectorAll('.os-brand small').forEach(el=>{
-    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 031</span>';
+    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 032</span>';
   });
 
   document.addEventListener('DOMContentLoaded',()=>{
@@ -6732,7 +6732,7 @@ initFirebaseApp();
     checks.push(check(size>4.5*1024*1024?'warn':'ok','Local storage usage',`${fmtBytes(size)} currently used by localStorage. ${size>4.5*1024*1024?'This is approaching common browser limits.':'Usage is within a comfortable range.'}`));
 
     const lastSave=Number(localStorage.getItem(LAST_SAVE_KEY)||0);
-    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 031 save heartbeat recorded yet.'));
+    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 032 save heartbeat recorded yet.'));
 
     const root=document.getElementById('os-diag-list');
     if(root)root.innerHTML=checks.map(c=>`
@@ -7626,7 +7626,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build025-fix-styles">
-/* Build 031 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
+/* Build 032 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
 #os-form-panel{
   max-width:1100px;
   margin:0 auto;
@@ -7726,7 +7726,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build026-location-fix-styles">
-/* Build 031: keep legacy location dialogs usable while Household OS shell is active. */
+/* Build 032: keep legacy location dialogs usable while Household OS shell is active. */
 #textModal.os-location-dialog-active,
 #locationsModal.os-location-dialog-active,
 #moveItemsModal.os-location-dialog-active,
@@ -7869,7 +7869,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build027-compat-styles">
-/* Build 031 compatibility/audit cleanup */
+/* Build 032 compatibility/audit cleanup */
 #os-legacy-return{
   position:fixed;right:14px;bottom:18px;z-index:1400;
   border:0;border-radius:999px;padding:11px 14px;
@@ -8016,7 +8016,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build028-modal-close-fix">
-/* Build 031: hidden legacy dialogs must always close, even if an earlier build forced them visible. */
+/* Build 032: hidden legacy dialogs must always close, even if an earlier build forced them visible. */
 .modal-overlay.hidden{
   display:none !important;
 }
@@ -8076,7 +8076,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build029-location-manager-close-styles">
-/* Build 031: make the Manage Locations close state authoritative. */
+/* Build 032: make the Manage Locations close state authoritative. */
 #locationsModal.hidden{
   display:none !important;
   visibility:hidden !important;
@@ -8183,7 +8183,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build030-confirm-modal-fix-styles">
-/* Build 031: confirmation dialogs must remain clickable above all location/photo UI. */
+/* Build 032: confirmation dialogs must remain clickable above all location/photo UI. */
 #confirmModal{
   z-index:2200 !important;
 }
@@ -8292,7 +8292,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build031-confirm-interaction-styles">
-/* Build 031: suspend the parent location manager while its confirmation is active. */
+/* Build 032: suspend the parent location manager while its confirmation is active. */
 body.os-location-confirm-open #locationsModal{
   pointer-events:none !important;
 }
@@ -8405,6 +8405,299 @@ body.os-location-confirm-open #confirmModal button{
     document.addEventListener('DOMContentLoaded',()=>setTimeout(wire,900));
   }else{
     setTimeout(wire,900);
+  }
+})();
+</script>
+
+
+
+<style id="household-os-build032-bulk-scanner-styles">
+/* Build 032: scanner controls always stay tappable above the camera layer/navigation. */
+#scannerModal{
+  z-index:6000 !important;
+  touch-action:manipulation;
+}
+#scannerModal.hidden{
+  display:none !important;
+  pointer-events:none !important;
+}
+#scannerModal:not(.hidden){
+  display:flex !important;
+  pointer-events:auto !important;
+}
+#scannerModal .modal-box,
+#scannerModal .modal-btns,
+#scannerModal button{
+  position:relative;
+  pointer-events:auto !important;
+  touch-action:manipulation;
+}
+#scannerModal .modal-btns{
+  position:sticky;
+  bottom:0;
+  z-index:6002;
+  background:#fff;
+  padding-top:10px;
+}
+</style>
+
+<script id="household-os-build032-bulk-scanner-engine">
+(function(){
+  let scanSessionId=0;
+  let backgroundLookups=new Map();
+
+  function scannerIsOpen(){
+    const modal=document.getElementById('scannerModal');
+    return !!(modal && !modal.classList.contains('hidden'));
+  }
+
+  function hardCloseScanner(){
+    scanSessionId++;
+
+    const modal=document.getElementById('scannerModal');
+    if(modal){
+      modal.classList.add('hidden');
+      modal.style.setProperty('display','none','important');
+      modal.style.setProperty('pointer-events','none','important');
+    }
+
+    if(window.scannerRAF){
+      try{cancelAnimationFrame(window.scannerRAF);}catch(e){}
+      window.scannerRAF=null;
+    }
+
+    try{
+      if(window.zxingReader && typeof window.zxingReader.reset==='function'){
+        window.zxingReader.reset();
+      }
+    }catch(e){}
+    window.zxingReader=null;
+
+    try{
+      if(window.scannerStream){
+        window.scannerStream.getTracks().forEach(t=>t.stop());
+      }
+    }catch(e){}
+    window.scannerStream=null;
+
+    const video=document.getElementById('scannerVideo');
+    if(video){
+      try{video.pause();}catch(e){}
+      video.srcObject=null;
+    }
+  }
+
+  /* Replace close with an authoritative, synchronous close path. */
+  window.closeScanner=hardCloseScanner;
+
+  function enrichEntryInBackground(entry, sessionAtStart){
+    if(!entry || !entry.barcode || backgroundLookups.has(entry.barcode))return;
+    const p=(async()=>{
+      try{
+        const controller=('AbortController' in window)?new AbortController():null;
+        const timer=controller?setTimeout(()=>controller.abort(),4500):null;
+        const res=await fetch(
+          'https://world.openfoodfacts.org/api/v0/product/'+encodeURIComponent(entry.barcode)+'.json',
+          controller?{signal:controller.signal}:undefined
+        );
+        if(timer)clearTimeout(timer);
+        const data=await res.json();
+        if(data.status===1 && data.product && data.product.product_name){
+          entry.name=data.product.product_name;
+          if(typeof cleanCategoryFromOFF==='function'){
+            entry.category=cleanCategoryFromOFF(data.product)||'';
+          }
+          const img=data.product.image_front_url||data.product.image_front_small_url;
+          if(img)entry.photo=img;
+          entry.found=true;
+        }
+      }catch(e){
+        // Network/product lookup must never block the camera.
+      }finally{
+        backgroundLookups.delete(entry.barcode);
+        if(typeof updateBatchScanUI==='function' && scannerIsOpen()){
+          try{updateBatchScanUI();}catch(e){}
+        }
+      }
+    })();
+    backgroundLookups.set(entry.barcode,p);
+  }
+
+  /* Critical scanner change:
+     record the barcode immediately and do product lookup asynchronously.
+     The old flow awaited Open Food Facts before allowing the next scan. */
+  window.addToBatchQueue=function(code){
+    code=String(code||'').trim();
+    if(!code)return;
+
+    const existing=batchScanQueue.find(b=>b.barcode===code);
+    if(existing){
+      existing.qty+=1;
+      updateBatchScanUI();
+      return;
+    }
+
+    const entry={
+      barcode:code,
+      name:code,
+      category:'',
+      photo:null,
+      qty:1,
+      found:false
+    };
+    batchScanQueue.push(entry);
+    updateBatchScanUI();
+    enrichEntryInBackground(entry,scanSessionId);
+  };
+
+  window.handleScanResult=function(code){
+    code=String(code||'').trim();
+    if(!code)return;
+
+    if(scanContext==='batch'){
+      const now=Date.now();
+      if(code===lastBatchCode && (now-lastBatchTime)<1800){
+        return;
+      }
+      lastBatchCode=code;
+      lastBatchTime=now;
+
+      // Do NOT await internet lookup. Camera is immediately free for the next barcode.
+      window.addToBatchQueue(code);
+      if(typeof setScannerStatus==='function'){
+        setScannerStatus('Scanned '+batchScanQueue.length+' item'+(batchScanQueue.length===1?'':'s')+' — ready for next barcode');
+      }
+      return;
+    }
+
+    if(scanHandled)return;
+    scanHandled=true;
+    hardCloseScanner();
+
+    (async()=>{
+      if(scanContext==='edit'){
+        document.getElementById('e-barcode').value=code;
+        if(typeof lookupProductByBarcodeForEdit==='function')await lookupProductByBarcodeForEdit(code);
+        return;
+      }
+
+      document.getElementById('f-barcode').value=code;
+      const existing=inventory.find(i=>i.barcode===code);
+      if(existing){
+        openConfirmModal('This is already in your inventory as "'+existing.name+'". Add 1 to the quantity instead of creating a duplicate?',function(ok){
+          if(ok){
+            changeQty(existing.id,1);
+            switchTab('inventory');
+          }
+        });
+        return;
+      }
+      if(typeof lookupProductByBarcode==='function')await lookupProductByBarcode(code);
+    })();
+  };
+
+  /* Rebuild the native detector loop so it never waits for product lookup. */
+  window.startNativeDetector=function(video){
+    let detector;
+    try{
+      detector=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','qr_code']});
+    }catch(e){
+      startZXingFallback(video);
+      return;
+    }
+
+    setScannerStatus(scanContext==='batch'?'Ready — scan as many barcodes as you like':'Ready — point at a barcode');
+    let errors=0;
+    const session=++scanSessionId;
+
+    const loop=async()=>{
+      if(session!==scanSessionId || !scannerStream || !scannerIsOpen())return;
+      try{
+        const codes=await detector.detect(video);
+        errors=0;
+        if(codes && codes.length){
+          window.handleScanResult(codes[0].rawValue);
+        }
+      }catch(e){
+        errors++;
+        if(errors>5){
+          startZXingFallback(video);
+          return;
+        }
+      }
+      if(session===scanSessionId && scannerStream && scannerIsOpen()){
+        scannerRAF=requestAnimationFrame(loop);
+      }
+    };
+    loop();
+  };
+
+  /* ZXing fallback also restarts immediately after capture instead of waiting
+     for a remote product lookup. */
+  window.runZXing=function(video){
+    const session=++scanSessionId;
+
+    const scanNext=()=>{
+      if(session!==scanSessionId || !scannerStream || !scannerIsOpen())return;
+      try{
+        zxingReader=new ZXingBrowser.BrowserMultiFormatReader();
+        setScannerStatus(scanContext==='batch'?'Ready — scan as many barcodes as you like':'Ready — point at a barcode');
+        zxingReader.decodeOnceFromVideoElement(video).then(function(result){
+          if(session!==scanSessionId || !scannerIsOpen())return;
+          if(result){
+            window.handleScanResult(result.getText());
+            if(scanContext==='batch' && scannerStream){
+              setTimeout(scanNext,80);
+            }
+          }
+        }).catch(function(){});
+      }catch(e){
+        setScannerStatus('The barcode scanner could not start on this device — close it and try again, or type the barcode manually.');
+      }
+    };
+    scanNext();
+  };
+
+  function wireScannerButtons(){
+    const cancel=document.getElementById('scannerCancelBtn');
+    const done=document.getElementById('scannerDoneBtn');
+
+    if(cancel && cancel.dataset.osBuild032!=='1'){
+      const c=cancel.cloneNode(true);
+      c.dataset.osBuild032='1';
+      c.removeAttribute('onclick');
+      cancel.replaceWith(c);
+      const cancelAction=e=>{
+        e.preventDefault();e.stopPropagation();hardCloseScanner();
+      };
+      c.addEventListener('click',cancelAction,{passive:false});
+      c.addEventListener('touchend',cancelAction,{passive:false});
+    }
+
+    const currentDone=document.getElementById('scannerDoneBtn');
+    if(currentDone && currentDone.dataset.osBuild032!=='1'){
+      const d=currentDone.cloneNode(true);
+      d.dataset.osBuild032='1';
+      d.removeAttribute('onclick');
+      currentDone.replaceWith(d);
+      const doneAction=e=>{
+        e.preventDefault();e.stopPropagation();
+        hardCloseScanner();
+        if(batchScanQueue.length===0){
+          if(typeof showInfo==='function')showInfo('No barcodes were scanned.','ℹ️');
+          return;
+        }
+        if(typeof showBatchScanReview==='function')showBatchScanReview();
+      };
+      d.addEventListener('click',doneAction,{passive:false});
+      d.addEventListener('touchend',doneAction,{passive:false});
+    }
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>setTimeout(wireScannerButtons,950));
+  }else{
+    setTimeout(wireScannerButtons,950);
   }
 })();
 </script>
