@@ -1185,7 +1185,7 @@
 <div class="modal-overlay hidden" id="batchReviewModal">
   <div class="modal-box" style="max-width:460px;text-align:left;max-height:85vh;overflow-y:auto;">
     <h3 style="text-align:center;">📷 Review Scanned Items</h3>
-    <p style="text-align:center;">Confirm each item, then add them all at once.</p>
+    <p style="text-align:center;">Confirm each item, then add them all at once. The food database used for lookup doesn't cover cleaning supplies or other non-food items — those will need their name and category checked manually below.</p>
     <label>Storage location (applies to all)</label>
     <select id="batch-location"></select>
     <div id="batchReviewList" style="margin-top:12px;"></div>
@@ -2949,7 +2949,12 @@ async function handleScanResult(code){
     }
     lastBatchCode = code;
     lastBatchTime = now;
-    await addToBatchQueue(code);
+    // Deliberately not awaited: the barcode is queued synchronously inside
+    // addToBatchQueue before any network call happens, so the scan loop can
+    // move on to recognizing the next barcode right away. The product
+    // name/photo lookup (which can be slow on a weak connection) fills in
+    // in the background instead of blocking the camera.
+    addToBatchQueue(code).catch(function(err){ console.warn('Batch scan lookup failed', err); });
     return;
   }
 
@@ -2987,7 +2992,7 @@ async function addToBatchQueue(code){
     updateBatchScanUI();
     return;
   }
-  const entry = { barcode: code, name: code, category: '', photo: null, qty: 1, found: false };
+  const entry = { barcode: code, name: code, category: '', photo: null, qty: 1, found: false, nutrition: null, likelyNonFood: false };
   batchScanQueue.push(entry);
   updateBatchScanUI();
 
@@ -3000,6 +3005,14 @@ async function addToBatchQueue(code){
       const img = data.product.image_front_url || data.product.image_front_small_url;
       if(img) entry.photo = img;
       entry.found = true;
+      entry.nutrition = extractNutritionFromOFF(data.product);
+    } else {
+      // Open Food Facts only covers food products, so a "not found" result
+      // is the expected, normal outcome when batch-scanning household items
+      // like cleaning supplies, paper goods, or personal care — not
+      // necessarily a bad scan. Flagged so the review screen can say so
+      // instead of implying something went wrong.
+      entry.likelyNonFood = true;
     }
   }catch(err){
     // No lookup available for this one — it stays in the queue with just
@@ -3015,9 +3028,10 @@ function updateBatchScanUI(){
     countEl.textContent = batchScanQueue.length + ' item' + (batchScanQueue.length===1?'':'s') + ' scanned';
   }
   if(listEl){
-    listEl.innerHTML = batchScanQueue.map(b=>
-      `<div style="font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border);">${b.found?'✅':'❔'} ${escapeHtml(b.name)}${b.qty>1?' ×'+b.qty:''}</div>`
-    ).join('');
+    listEl.innerHTML = batchScanQueue.map(b=>{
+      const icon = b.found ? '✅' : (b.likelyNonFood ? '🧴' : '❔');
+      return `<div style="font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border);">${icon} ${escapeHtml(b.name)}${b.qty>1?' ×'+b.qty:''}</div>`;
+    }).join('');
   }
 }
 
@@ -3047,7 +3061,9 @@ function showBatchScanReview(){
           <input type="number" id="br-qty-${i}" value="${b.qty}" min="0" style="width:65px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;" placeholder="Qty">
           <input type="number" id="br-min-${i}" value="1" min="0" style="width:65px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;" placeholder="Min">
           ${b.category ? `<span class="entry-tag">${escapeHtml(b.category)}</span>` : ''}
-          ${!b.found ? `<span style="font-size:0.72rem;color:var(--muted);">no online match — check the name</span>` : ''}
+          ${b.found ? `<span style="font-size:0.72rem;color:var(--green);">🥗 nutrition facts found — available on this item after adding</span>` : ''}
+          ${(!b.found && b.likelyNonFood) ? `<span style="font-size:0.72rem;color:var(--muted);">🧴 no food-database match — likely a household/non-food item. Check the name & category.</span>` : ''}
+          ${(!b.found && !b.likelyNonFood) ? `<span style="font-size:0.72rem;color:var(--muted);">no online match — check the name</span>` : ''}
         </div>
       </div>
     </div>`).join('');
@@ -3088,7 +3104,7 @@ function addBatchItems(){
       frozenDate: null,
       expiryDate: null,
       photo: b.photo || null,
-      nutrition: null,
+      nutrition: b.nutrition || null,
       favorite: false,
       price: null
     };
