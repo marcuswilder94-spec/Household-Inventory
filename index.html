@@ -569,7 +569,17 @@ body.os-phase1{background:var(--os-bg)!important;color:var(--os-text)!important}
 </style>
 
 
-<style id="household-os-build003-styles">\n.os-form-panel{display:none}.os-form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}\n.os-field{display:flex;flex-direction:column;gap:6px}.os-field.full{grid-column:1/-1}.os-field label{font-size:12px;font-weight:800;color:#4b5563}\n.os-field input,.os-field select,.os-field textarea{box-sizing:border-box;width:100%;border:1px solid var(--os-border);background:#fff;border-radius:12px;padding:11px 12px;font:inherit;outline:none}\n.os-field input:focus,.os-field select:focus,.os-field textarea:focus{border-color:#8eb0ff;box-shadow:0 0 0 4px #eaf1ff}\n.os-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.os-primary{border:0;background:var(--os-primary);color:#fff;border-radius:11px;padding:11px 16px;font-weight:800;cursor:pointer}.os-secondary{border:1px solid var(--os-border);background:#fff;border-radius:11px;padding:11px 16px;font-weight:800;cursor:pointer}\n.os-pack{display:grid;grid-template-columns:1fr 1fr;gap:8px}.os-helper{font-size:11px;color:var(--os-muted)}\n.os-success{margin-top:10px;padding:10px;border-radius:10px;background:#dcfce7;color:#166534;font-weight:700;display:none}\n.os-danger-note{margin-top:8px;padding:9px 10px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px}\n@media(max-width:620px){.os-form-grid{grid-template-columns:1fr}.os-field.full{grid-column:auto}.os-pack{grid-template-columns:1fr}}\n</style>
+<style id="household-os-build003-styles">
+.os-form-panel{display:none}.os-form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.os-field{display:flex;flex-direction:column;gap:6px}.os-field.full{grid-column:1/-1}.os-field label{font-size:12px;font-weight:800;color:#4b5563}
+.os-field input,.os-field select,.os-field textarea{box-sizing:border-box;width:100%;border:1px solid var(--os-border);background:#fff;border-radius:12px;padding:11px 12px;font:inherit;outline:none}
+.os-field input:focus,.os-field select:focus,.os-field textarea:focus{border-color:#8eb0ff;box-shadow:0 0 0 4px #eaf1ff}
+.os-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.os-primary{border:0;background:var(--os-primary);color:#fff;border-radius:11px;padding:11px 16px;font-weight:800;cursor:pointer}.os-secondary{border:1px solid var(--os-border);background:#fff;border-radius:11px;padding:11px 16px;font-weight:800;cursor:pointer}
+.os-pack{display:grid;grid-template-columns:1fr 1fr;gap:8px}.os-helper{font-size:11px;color:var(--os-muted)}
+.os-success{margin-top:10px;padding:10px;border-radius:10px;background:#dcfce7;color:#166534;font-weight:700;display:none}
+.os-danger-note{margin-top:8px;padding:9px 10px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px}
+@media(max-width:620px){.os-form-grid{grid-template-columns:1fr}.os-field.full{grid-column:auto}.os-pack{grid-template-columns:1fr}}
+</style>
 
 
 <style id="household-os-build004-styles">
@@ -1150,7 +1160,7 @@ font-size:23px;flex:0 0 auto}
 
 
 <style id="household-os-build023-location-visuals">
-/* Build 026: calmer Household OS home hero + location-specific visual headers */
+/* Build 027: calmer Household OS home hero + location-specific visual headers */
 .os-home-cover-023{
   position:relative;overflow:hidden;border-radius:22px;margin-bottom:16px;min-height:235px;
   background:
@@ -1473,7 +1483,7 @@ body.os-dark .os-location-edit-actions button{background:#0f172a;color:var(--os-
   </div>
 </section>
 
-<!-- Build 026 branding: Household OS | Your home. Organized. -->
+<!-- Build 027 branding: Household OS | Your home. Organized. -->
 <section id="os-settings-panel" class="os-settings-panel">
   <div class="os-inventory-head">
     <div><h2>Settings & Data</h2><div class="os-item-meta">Customize Household OS, set household defaults, and protect your data.</div></div>
@@ -4687,7 +4697,78 @@ initFirebaseApp();
 </script>
 
 
-<script id="household-os-build003-engine">\n(function(){\n  function fillDatalists(){\n    const locs=Array.isArray(window.LOCATIONS)?window.LOCATIONS:[];\n    const cats=[...new Set((Array.isArray(window.inventory)?window.inventory:[]).map(i=>i.category).filter(Boolean))].sort();\n    const l=document.getElementById('os-location-list'); if(l)l.innerHTML=locs.map(x=>`<option value="${osEscAttr(x)}"></option>`).join('');\n    const c=document.getElementById('os-category-list'); if(c)c.innerHTML=cats.map(x=>`<option value="${osEscAttr(x)}"></option>`).join('');\n  }\n  function osEscAttr(s){return String(s||'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));}\n  window.osOpenAddForm=function(){\n    document.querySelectorAll('#os-shell > *').forEach(x=>{if(x.tagName!=='NAV')x.style.display='none';});\n    const p=document.getElementById('os-form-panel'); if(p)p.style.display='block';\n    fillDatalists();\n    ['os-f-name','os-f-category','os-f-location','os-f-unit','os-f-store','os-f-barcode','os-f-purchase','os-f-frozen','os-f-expiry','os-f-packqty','os-f-packunit','os-f-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});\n    document.getElementById('os-f-qty').value='1';\n    document.getElementById('os-f-min').value='0';\n    document.getElementById('os-f-favorite').checked=false;\n    document.getElementById('os-f-skip-grocery').checked=false;\n    document.getElementById('os-form-success').style.display='none';\n    setTimeout(()=>document.getElementById('os-f-name')?.focus(),50);\n  };\n  window.osCloseForm=function(){document.getElementById('os-form-panel').style.display='none'; if(typeof osReturnHome==='function')osReturnHome();};\n  window.osOpenAdvancedAdd=function(){\n    document.getElementById('os-form-panel').style.display='none';\n    if(typeof osOpenLegacy==='function')osOpenLegacy();\n    setTimeout(()=>{if(typeof switchTab==='function')switchTab('add');},50);\n  };\n  window.osSaveNewItem=function(){\n    const name=document.getElementById('os-f-name').value.trim();\n    if(!name){alert('Please enter an item name.');document.getElementById('os-f-name').focus();return;}\n    const barcode=document.getElementById('os-f-barcode').value.trim()||null;\n    const inv=Array.isArray(window.inventory)?window.inventory:[];\n    if(barcode){\n      const duplicate=inv.find(i=>i.barcode===barcode);\n      if(duplicate && !confirm(`This barcode is already used by ${duplicate.name}. Add another item anyway?`))return;\n    }\n    const item={\n      id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),\n      name,\n      category:document.getElementById('os-f-category').value.trim()||'Uncategorized',\n      store:document.getElementById('os-f-store').value.trim()||null,\n      location:document.getElementById('os-f-location').value.trim()||'Unassigned',\n      qty:Number(document.getElementById('os-f-qty').value)||0,\n      min:Number(document.getElementById('os-f-min').value)||0,\n      skipGrocery:document.getElementById('os-f-skip-grocery').checked,\n      unit:document.getElementById('os-f-unit').value.trim(),\n      packSize:Number(document.getElementById('os-f-packqty').value)||null,\n      packUnit:document.getElementById('os-f-packunit').value.trim()||null,\n      packsPerBox:null,boxLabel:null,\n      notes:document.getElementById('os-f-notes').value.trim(),\n      barcode,\n      purchaseDate:document.getElementById('os-f-purchase').value||null,\n      frozenDate:document.getElementById('os-f-frozen').value||null,\n      expiryDate:document.getElementById('os-f-expiry').value||null,\n      photo:null,nutrition:null,\n      favorite:document.getElementById('os-f-favorite').checked\n    };\n    if(!Array.isArray(window.inventory))window.inventory=[];\n    window.inventory.push(item);\n    if(typeof checkReorder==='function')checkReorder(item);\n    if(typeof save==='function')save();\n    if(typeof osRefresh==='function')osRefresh();\n    const msg=document.getElementById('os-form-success');\n    msg.textContent=`${name} was added to your household inventory.`;msg.style.display='block';\n    setTimeout(()=>{document.getElementById('os-form-panel').style.display='none';if(typeof osOpenInventory==='function')osOpenInventory();},450);\n  };\n  document.addEventListener('DOMContentLoaded',()=>{\n    const add=[...document.querySelectorAll('#os-shell .os-action')].find(x=>x.textContent.includes('Add Item'));\n    if(add)add.onclick=osOpenAddForm;\n  });\n})();\n</script>
+<script id="household-os-build003-engine">
+(function(){
+  function fillDatalists(){
+    const locs=Array.isArray(window.LOCATIONS)?window.LOCATIONS:[];
+    const cats=[...new Set((Array.isArray(window.inventory)?window.inventory:[]).map(i=>i.category).filter(Boolean))].sort();
+    const l=document.getElementById('os-location-list'); if(l)l.innerHTML=locs.map(x=>`<option value="${osEscAttr(x)}"></option>`).join('');
+    const c=document.getElementById('os-category-list'); if(c)c.innerHTML=cats.map(x=>`<option value="${osEscAttr(x)}"></option>`).join('');
+  }
+  function osEscAttr(s){return String(s||'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));}
+  window.osOpenAddForm=function(){
+    document.querySelectorAll('#os-shell > *').forEach(x=>{if(x.tagName!=='NAV')x.style.display='none';});
+    const p=document.getElementById('os-form-panel'); if(p)p.style.display='block';
+    fillDatalists();
+    ['os-f-name','os-f-category','os-f-location','os-f-unit','os-f-store','os-f-barcode','os-f-purchase','os-f-frozen','os-f-expiry','os-f-packqty','os-f-packunit','os-f-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+    document.getElementById('os-f-qty').value='1';
+    document.getElementById('os-f-min').value='0';
+    document.getElementById('os-f-favorite').checked=false;
+    document.getElementById('os-f-skip-grocery').checked=false;
+    document.getElementById('os-form-success').style.display='none';
+    setTimeout(()=>document.getElementById('os-f-name')?.focus(),50);
+  };
+  window.osCloseForm=function(){document.getElementById('os-form-panel').style.display='none'; if(typeof osReturnHome==='function')osReturnHome();};
+  window.osOpenAdvancedAdd=function(){
+    document.getElementById('os-form-panel').style.display='none';
+    if(typeof osOpenLegacy==='function')osOpenLegacy();
+    setTimeout(()=>{if(typeof switchTab==='function')switchTab('add');},50);
+  };
+  window.osSaveNewItem=function(){
+    const name=document.getElementById('os-f-name').value.trim();
+    if(!name){alert('Please enter an item name.');document.getElementById('os-f-name').focus();return;}
+    const barcode=document.getElementById('os-f-barcode').value.trim()||null;
+    const inv=Array.isArray(window.inventory)?window.inventory:[];
+    if(barcode){
+      const duplicate=inv.find(i=>i.barcode===barcode);
+      if(duplicate && !confirm(`This barcode is already used by ${duplicate.name}. Add another item anyway?`))return;
+    }
+    const item={
+      id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+      name,
+      category:document.getElementById('os-f-category').value.trim()||'Uncategorized',
+      store:document.getElementById('os-f-store').value.trim()||null,
+      location:document.getElementById('os-f-location').value.trim()||'Unassigned',
+      qty:Number(document.getElementById('os-f-qty').value)||0,
+      min:Number(document.getElementById('os-f-min').value)||0,
+      skipGrocery:document.getElementById('os-f-skip-grocery').checked,
+      unit:document.getElementById('os-f-unit').value.trim(),
+      packSize:Number(document.getElementById('os-f-packqty').value)||null,
+      packUnit:document.getElementById('os-f-packunit').value.trim()||null,
+      packsPerBox:null,boxLabel:null,
+      notes:document.getElementById('os-f-notes').value.trim(),
+      barcode,
+      purchaseDate:document.getElementById('os-f-purchase').value||null,
+      frozenDate:document.getElementById('os-f-frozen').value||null,
+      expiryDate:document.getElementById('os-f-expiry').value||null,
+      photo:null,nutrition:null,
+      favorite:document.getElementById('os-f-favorite').checked
+    };
+    if(!Array.isArray(window.inventory))window.inventory=[];
+    window.inventory.push(item);
+    if(typeof checkReorder==='function')checkReorder(item);
+    if(typeof save==='function')save();
+    if(typeof osRefresh==='function')osRefresh();
+    const msg=document.getElementById('os-form-success');
+    msg.textContent=`${name} was added to your household inventory.`;msg.style.display='block';
+    setTimeout(()=>{document.getElementById('os-form-panel').style.display='none';if(typeof osOpenInventory==='function')osOpenInventory();},450);
+  };
+  document.addEventListener('DOMContentLoaded',()=>{
+    const add=[...document.querySelectorAll('#os-shell .os-action')].find(x=>x.textContent.includes('Add Item'));
+    if(add)add.onclick=osOpenAddForm;
+  });
+})();
+</script>
 
 
 <script id="household-os-build004-engine">
@@ -6558,7 +6639,7 @@ initFirebaseApp();
 
   // Keep version display current.
   document.querySelectorAll('.os-brand small').forEach(el=>{
-    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 026</span>';
+    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 027</span>';
   });
 
   document.addEventListener('DOMContentLoaded',()=>{
@@ -6651,7 +6732,7 @@ initFirebaseApp();
     checks.push(check(size>4.5*1024*1024?'warn':'ok','Local storage usage',`${fmtBytes(size)} currently used by localStorage. ${size>4.5*1024*1024?'This is approaching common browser limits.':'Usage is within a comfortable range.'}`));
 
     const lastSave=Number(localStorage.getItem(LAST_SAVE_KEY)||0);
-    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 026 save heartbeat recorded yet.'));
+    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 027 save heartbeat recorded yet.'));
 
     const root=document.getElementById('os-diag-list');
     if(root)root.innerHTML=checks.map(c=>`
@@ -7544,8 +7625,8 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 
-<style id="household-os-build025-fixes">
-/* Build 026 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
+<style id="household-os-build025-fix-styles">
+/* Build 027 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
 #os-form-panel{
   max-width:1100px;
   margin:0 auto;
@@ -7583,7 +7664,7 @@ window.HOUSEHOLD_OS_BRAND = {
 }
 </style>
 
-<script id="household-os-build025-fixes">
+<script id="household-os-build025-fix-engine">
 (function(){
   function openModernFullInventory(){
     if(typeof window.osOpenInventory==='function'){
@@ -7644,8 +7725,8 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 
-<style id="household-os-build026-location-fixes">
-/* Build 026: keep legacy location dialogs usable while Household OS shell is active. */
+<style id="household-os-build026-location-fix-styles">
+/* Build 027: keep legacy location dialogs usable while Household OS shell is active. */
 #textModal.os-location-dialog-active,
 #locationsModal.os-location-dialog-active,
 #moveItemsModal.os-location-dialog-active,
@@ -7656,7 +7737,7 @@ window.HOUSEHOLD_OS_BRAND = {
 }
 </style>
 
-<script id="household-os-build026-location-fixes">
+<script id="household-os-build026-location-fix-engine">
 (function(){
   function showExternalModal(id){
     var el=document.getElementById(id);
@@ -7782,6 +7863,153 @@ window.HOUSEHOLD_OS_BRAND = {
   }else{
     setTimeout(wire,500);
   }
+})();
+</script>
+
+
+
+<style id="household-os-build027-compat-styles">
+/* Build 027 compatibility/audit cleanup */
+#os-legacy-return{
+  position:fixed;right:14px;bottom:18px;z-index:1400;
+  border:0;border-radius:999px;padding:11px 14px;
+  background:#172033;color:#fff;font-weight:800;
+  box-shadow:0 10px 28px rgba(15,23,42,.24);
+  display:none;cursor:pointer;
+}
+body.os-legacy-open #os-legacy-return{display:block}
+body.os-legacy-open #os-shell{display:none!important}
+</style>
+
+<script id="household-os-build027-compat-engine">
+(function(){
+  const MODAL_SELECTOR='.modal-overlay';
+
+  function legacyRoot(){
+    return document.getElementById('appRoot');
+  }
+
+  function portalLegacyModals(){
+    const root=legacyRoot();
+    if(!root)return;
+    [...root.querySelectorAll(MODAL_SELECTOR)].forEach(modal=>{
+      if(modal.dataset.osPortaled==='1')return;
+      modal.dataset.osPortaled='1';
+      document.body.appendChild(modal);
+    });
+  }
+
+  function syncModalDisplay(modal){
+    if(!modal)return;
+    if(modal.classList.contains('hidden')){
+      modal.style.display='none';
+    }else{
+      modal.style.display='flex';
+    }
+  }
+
+  function observeLegacyModals(){
+    document.querySelectorAll(MODAL_SELECTOR).forEach(modal=>{
+      syncModalDisplay(modal);
+      new MutationObserver(()=>syncModalDisplay(modal)).observe(modal,{
+        attributes:true,
+        attributeFilter:['class']
+      });
+    });
+  }
+
+  function addLegacyReturnButton(){
+    if(document.getElementById('os-legacy-return'))return;
+    const b=document.createElement('button');
+    b.id='os-legacy-return';
+    b.type='button';
+    b.textContent='← Back to Household OS';
+    b.onclick=window.osReturnFromLegacy;
+    document.body.appendChild(b);
+  }
+
+  window.osOpenLegacy=function(){
+    portalLegacyModals();
+    const shell=document.getElementById('os-shell');
+    const root=legacyRoot();
+
+    if(shell)shell.style.display='none';
+
+    if(root){
+      root.style.display=root.dataset.osLegacyDisplay||'';
+      // If authentication already unlocked the legacy app, keep it unlocked.
+      // Do not remove .hidden here when the auth gate still owns visibility.
+    }
+
+    document.body.classList.add('os-legacy-open');
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  window.osReturnFromLegacy=function(){
+    const root=legacyRoot();
+    if(root)root.style.display='none';
+
+    document.querySelectorAll(MODAL_SELECTOR).forEach(modal=>{
+      modal.classList.add('hidden');
+      modal.style.display='none';
+    });
+
+    document.body.classList.remove('os-legacy-open');
+    const shell=document.getElementById('os-shell');
+    if(shell)shell.style.display='block';
+
+    if(typeof osReturnHome==='function')osReturnHome();
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  /* Old bottom-nav calls should use current Household OS pages, not hidden legacy pages. */
+  window.osGoLegacy=function(tab){
+    const modern={
+      inventory:'osOpenInventory',
+      grocery:'osOpenGrocery',
+      locations:'osOpenLocations',
+      settings:'osOpenSettings'
+    };
+    const fn=modern[tab];
+    if(fn && typeof window[fn]==='function'){
+      window[fn]();
+      return;
+    }
+    window.osOpenLegacy();
+    setTimeout(()=>{
+      if(typeof window.switchTab==='function')window.switchTab(tab);
+    },40);
+  };
+
+  /* Keep every legacy modal available to modern screens. */
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(()=>{
+      portalLegacyModals();
+      observeLegacyModals();
+      addLegacyReturnButton();
+
+      // Re-run the locations manager wiring after the modal portal is established.
+      const locPanel=document.getElementById('os-locations-panel');
+      if(locPanel){
+        locPanel.querySelectorAll('button').forEach(btn=>{
+          const t=btn.textContent.trim();
+          if(t.includes('Add Location') && typeof window.osAddLocationQuick==='function'){
+            btn.onclick=window.osAddLocationQuick;
+          }
+          if(t.includes('Manage Photos & Locations')){
+            btn.onclick=function(){
+              if(typeof renderLocationsList==='function')renderLocationsList();
+              const modal=document.getElementById('locationsModal');
+              if(modal){
+                modal.classList.remove('hidden');
+                modal.style.display='flex';
+              }
+            };
+          }
+        });
+      }
+    },650);
+  });
 })();
 </script>
 
