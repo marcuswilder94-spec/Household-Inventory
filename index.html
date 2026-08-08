@@ -1160,7 +1160,7 @@ font-size:23px;flex:0 0 auto}
 
 
 <style id="household-os-build023-location-visuals">
-/* Build 028: calmer Household OS home hero + location-specific visual headers */
+/* Build 030: calmer Household OS home hero + location-specific visual headers */
 .os-home-cover-023{
   position:relative;overflow:hidden;border-radius:22px;margin-bottom:16px;min-height:235px;
   background:
@@ -1483,7 +1483,7 @@ body.os-dark .os-location-edit-actions button{background:#0f172a;color:var(--os-
   </div>
 </section>
 
-<!-- Build 028 branding: Household OS | Your home. Organized. -->
+<!-- Build 030 branding: Household OS | Your home. Organized. -->
 <section id="os-settings-panel" class="os-settings-panel">
   <div class="os-inventory-head">
     <div><h2>Settings & Data</h2><div class="os-item-meta">Customize Household OS, set household defaults, and protect your data.</div></div>
@@ -6639,7 +6639,7 @@ initFirebaseApp();
 
   // Keep version display current.
   document.querySelectorAll('.os-brand small').forEach(el=>{
-    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 028</span>';
+    if(el.textContent.includes('Build'))el.innerHTML='v2.0 Alpha <span class="os-version-pill">Build 030</span>';
   });
 
   document.addEventListener('DOMContentLoaded',()=>{
@@ -6732,7 +6732,7 @@ initFirebaseApp();
     checks.push(check(size>4.5*1024*1024?'warn':'ok','Local storage usage',`${fmtBytes(size)} currently used by localStorage. ${size>4.5*1024*1024?'This is approaching common browser limits.':'Usage is within a comfortable range.'}`));
 
     const lastSave=Number(localStorage.getItem(LAST_SAVE_KEY)||0);
-    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 028 save heartbeat recorded yet.'));
+    checks.push(check(lastSave?'ok':'warn','Save heartbeat',lastSave?`Last Household OS save: ${new Date(lastSave).toLocaleString()}`:'No Build 030 save heartbeat recorded yet.'));
 
     const root=document.getElementById('os-diag-list');
     if(root)root.innerHTML=checks.map(c=>`
@@ -7626,7 +7626,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build025-fix-styles">
-/* Build 028 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
+/* Build 030 consolidated fixes: reachable form actions + modern full inventory + clear empty state. */
 #os-form-panel{
   max-width:1100px;
   margin:0 auto;
@@ -7726,7 +7726,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build026-location-fix-styles">
-/* Build 028: keep legacy location dialogs usable while Household OS shell is active. */
+/* Build 030: keep legacy location dialogs usable while Household OS shell is active. */
 #textModal.os-location-dialog-active,
 #locationsModal.os-location-dialog-active,
 #moveItemsModal.os-location-dialog-active,
@@ -7869,7 +7869,7 @@ window.HOUSEHOLD_OS_BRAND = {
 
 
 <style id="household-os-build027-compat-styles">
-/* Build 028 compatibility/audit cleanup */
+/* Build 030 compatibility/audit cleanup */
 #os-legacy-return{
   position:fixed;right:14px;bottom:18px;z-index:1400;
   border:0;border-radius:999px;padding:11px 14px;
@@ -8016,7 +8016,7 @@ body.os-legacy-open #os-shell{display:none!important}
 
 
 <style id="household-os-build028-modal-close-fix">
-/* Build 028: hidden legacy dialogs must always close, even if an earlier build forced them visible. */
+/* Build 030: hidden legacy dialogs must always close, even if an earlier build forced them visible. */
 .modal-overlay.hidden{
   display:none !important;
 }
@@ -8070,6 +8070,222 @@ body.os-legacy-open #os-shell{display:none!important}
         }
       }).observe(el,{attributes:true,attributeFilter:['class']});
     });
+})();
+</script>
+
+
+
+<style id="household-os-build029-location-manager-close-styles">
+/* Build 030: make the Manage Locations close state authoritative. */
+#locationsModal.hidden{
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
+#locationsModal:not(.hidden){
+  visibility:visible;
+  pointer-events:auto;
+}
+</style>
+
+<script id="household-os-build029-location-manager-close-engine">
+(function(){
+  function hardCloseLocationsManager(){
+    const modal=document.getElementById('locationsModal');
+    if(!modal)return;
+
+    modal.classList.add('hidden');
+    modal.classList.remove('os-location-dialog-active');
+    modal.style.setProperty('display','none','important');
+    modal.style.visibility='hidden';
+    modal.style.pointerEvents='none';
+
+    /* Clear the file picker so a completed photo selection cannot leave the
+       manager in a stale/open state on the next visit. */
+    const photoInput=document.getElementById('loc-photo-input');
+    if(photoInput)photoInput.value='';
+
+    if(typeof window.osRenderLocations==='function'){
+      setTimeout(window.osRenderLocations,0);
+    }
+  }
+
+  window.closeManageLocations=hardCloseLocationsManager;
+
+  function openLocationsManager(){
+    if(typeof renderLocationsList==='function')renderLocationsList();
+    const modal=document.getElementById('locationsModal');
+    if(!modal)return;
+
+    modal.classList.remove('hidden');
+    modal.classList.add('os-location-dialog-active');
+    modal.style.removeProperty('visibility');
+    modal.style.removeProperty('pointer-events');
+    modal.style.setProperty('display','flex','important');
+  }
+
+  window.osOpenLegacyLocationManager=openLocationsManager;
+
+  function wireCloseControls(){
+    const modal=document.getElementById('locationsModal');
+    if(!modal)return;
+
+    /* Replace the inline close button with an explicit event listener.
+       This avoids any older closeManageLocations definition winning later. */
+    const closeBtn=[...modal.querySelectorAll('button')].find(
+      b=>b.textContent.trim()==='Close'
+    );
+    if(closeBtn && closeBtn.dataset.osCloseWired!=='1'){
+      closeBtn.dataset.osCloseWired='1';
+      closeBtn.removeAttribute('onclick');
+      closeBtn.addEventListener('click',function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        hardCloseLocationsManager();
+      });
+    }
+
+    /* Backdrop click and Escape are additional safe exit paths. */
+    if(modal.dataset.osBackdropWired!=='1'){
+      modal.dataset.osBackdropWired='1';
+      modal.addEventListener('click',function(e){
+        if(e.target===modal)hardCloseLocationsManager();
+      });
+    }
+  }
+
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Escape')return;
+    const modal=document.getElementById('locationsModal');
+    if(modal && !modal.classList.contains('hidden')){
+      hardCloseLocationsManager();
+    }
+  });
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>setTimeout(wireCloseControls,700));
+  }else{
+    setTimeout(wireCloseControls,700);
+  }
+
+  /* Re-wire after location/photo list redraws, since the inner list changes. */
+  const originalRenderLocationsList=window.renderLocationsList;
+  if(typeof originalRenderLocationsList==='function'){
+    window.renderLocationsList=function(){
+      const result=originalRenderLocationsList.apply(this,arguments);
+      setTimeout(wireCloseControls,0);
+      return result;
+    };
+  }
+})();
+</script>
+
+
+
+<style id="household-os-build030-confirm-modal-fix-styles">
+/* Build 030: confirmation dialogs must remain clickable above all location/photo UI. */
+#confirmModal{
+  z-index:2200 !important;
+}
+#confirmModal.hidden{
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
+#confirmModal:not(.hidden){
+  display:flex !important;
+  visibility:visible !important;
+  pointer-events:auto !important;
+}
+#confirmModal .modal-box{
+  position:relative;
+  z-index:2201;
+  pointer-events:auto !important;
+}
+#confirmModal button{
+  pointer-events:auto !important;
+}
+</style>
+
+<script id="household-os-build030-confirm-modal-fix-engine">
+(function(){
+  function openConfirmCompat(message, callback){
+    const modal=document.getElementById('confirmModal');
+    const msg=document.getElementById('confirmModalMsg');
+    if(msg)msg.textContent=message||'Are you sure?';
+    window.confirmModalCallback=typeof callback==='function'?callback:null;
+    if(modal){
+      modal.classList.remove('hidden');
+      modal.classList.add('os-location-dialog-active');
+      modal.style.setProperty('display','flex','important');
+      modal.style.visibility='visible';
+      modal.style.pointerEvents='auto';
+    }
+  }
+
+  const originalOpenConfirm=window.openConfirmModal;
+  window.openConfirmModal=function(message, callback){
+    if(typeof originalOpenConfirm==='function'){
+      try{ originalOpenConfirm.apply(this,arguments); }catch(e){}
+    }
+    openConfirmCompat(message, callback);
+  };
+
+  window.confirmModalRespond=function(answer){
+    const cb=window.confirmModalCallback;
+    const modal=document.getElementById('confirmModal');
+
+    if(modal){
+      modal.classList.add('hidden');
+      modal.classList.remove('os-location-dialog-active');
+      modal.style.setProperty('display','none','important');
+      modal.style.visibility='hidden';
+      modal.style.pointerEvents='none';
+    }
+
+    window.confirmModalCallback=null;
+
+    if(typeof cb==='function'){
+      try{ cb(!!answer); }catch(e){ console.error(e); }
+    }
+
+    if(typeof window.osRenderLocations==='function'){
+      setTimeout(window.osRenderLocations,0);
+    }
+  };
+
+  function wireConfirmButtons(){
+    const modal=document.getElementById('confirmModal');
+    if(!modal)return;
+    const buttons=[...modal.querySelectorAll('button')];
+    const noBtn=buttons.find(b=>b.textContent.trim()==='No');
+    const yesBtn=buttons.find(b=>b.textContent.trim()==='Yes');
+
+    if(noBtn && noBtn.dataset.osConfirmWired!=='1'){
+      noBtn.dataset.osConfirmWired='1';
+      noBtn.removeAttribute('onclick');
+      noBtn.addEventListener('click',function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        window.confirmModalRespond(false);
+      });
+    }
+    if(yesBtn && yesBtn.dataset.osConfirmWired!=='1'){
+      yesBtn.dataset.osConfirmWired='1';
+      yesBtn.removeAttribute('onclick');
+      yesBtn.addEventListener('click',function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        window.confirmModalRespond(true);
+      });
+    }
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>setTimeout(wireConfirmButtons,800));
+  }else{
+    setTimeout(wireConfirmButtons,800);
+  }
 })();
 </script>
 
