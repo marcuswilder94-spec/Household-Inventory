@@ -857,9 +857,6 @@
           <button type="button" class="dash-action-btn" onclick="switchTab('add');setTimeout(function(){openScanner('add');},150);">
             <span class="dash-action-icon">📷</span><span>Scan Barcode</span>
           </button>
-          <button type="button" class="dash-action-btn" onclick="switchTab('add');setTimeout(function(){openBatchLocationPicker();},150);">
-            <span class="dash-action-icon">📦</span><span>Scan Multiple</span>
-          </button>
           <button type="button" class="dash-action-btn" onclick="switchTab('add');setTimeout(function(){openReceiptScanner();},150);">
             <span class="dash-action-icon">🧾</span><span>Scan Receipt</span>
           </button>
@@ -888,7 +885,6 @@
       <h2>➕ Add an Item</h2>
       <p class="sub">Enter it once. From now on you just adjust the quantity.</p>
 
-      <button type="button" class="btn-secondary" style="width:100%;margin-bottom:8px;" onclick="openBatchLocationPicker()">📷 Scan Multiple Items (bulk add)</button>
       <button type="button" class="btn-secondary" style="width:100%;margin-bottom:16px;" onclick="openReceiptScanner()">🧾 Scan a Receipt Instead (bulk add)</button>
 
       <label>Item name</label>
@@ -1141,18 +1137,6 @@
   </div>
 </div>
 
-<div class="modal-overlay hidden" id="batchLocationModal">
-  <div class="modal-box" style="max-width:360px;">
-    <h3 style="text-align:center;">📷 Scan Multiple Items</h3>
-    <p style="text-align:center;">Which location are you stocking? Everything you scan next will go there.</p>
-    <select id="batch-start-location"></select>
-    <div class="modal-btns" style="margin-top:16px;">
-      <button class="modal-btn-no" style="flex:1;" onclick="closeBatchLocationPicker()">Cancel</button>
-      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmBatchLocationAndScan()">Start Scanning</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay hidden" id="moveToLocationModal">
   <div class="modal-box" style="max-width:360px;">
     <h3 style="text-align:center;">📦 Move Selected Items</h3>
@@ -1171,28 +1155,8 @@
     <p style="text-align:center;" id="scannerSubtitle">Point your camera at the barcode.</p>
     <video id="scannerVideo" style="width:100%;border-radius:12px;background:#000;display:block;" playsinline muted autoplay></video>
     <div id="scannerStatus" style="text-align:center;font-size:0.85rem;color:var(--muted);margin-top:10px;min-height:1.2em;">Requesting camera access…</div>
-    <div id="batchScanPanel" class="hidden" style="margin-top:10px;">
-      <div id="batchScanCount" style="text-align:center;font-weight:700;font-size:0.85rem;margin-bottom:6px;">0 items scanned</div>
-      <div id="batchScanList" style="max-height:130px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;"></div>
-      <button type="button" class="btn-secondary" id="forceAltScannerBtn" style="width:100%;margin-top:8px;font-size:0.8rem;" onclick="forceAlternateScanner()">🔄 Not recognizing this barcode? Try backup scanner</button>
-    </div>
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" id="scannerCancelBtn" onclick="closeScanner()">Cancel</button>
-      <button class="modal-btn-yes hidden" id="scannerDoneBtn" style="flex:1;background:var(--blue);" onclick="finishBatchScan()">Done Scanning</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay hidden" id="batchReviewModal">
-  <div class="modal-box" style="max-width:460px;text-align:left;max-height:85vh;overflow-y:auto;">
-    <h3 style="text-align:center;">📷 Review Scanned Items</h3>
-    <p style="text-align:center;">Confirm each item, then add them all at once. The food database used for lookup doesn't cover cleaning supplies or other non-food items — those will need their name and category checked manually below.</p>
-    <label>Storage location (applies to all)</label>
-    <select id="batch-location"></select>
-    <div id="batchReviewList" style="margin-top:12px;"></div>
-    <div class="modal-btns" style="margin-top:16px;">
-      <button class="modal-btn-no" style="flex:1;" onclick="closeBatchReviewModal()">Cancel</button>
-      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="addBatchItems()">Add All to Inventory</button>
     </div>
   </div>
 </div>
@@ -2774,26 +2738,7 @@ let scannerStream = null;
 let scannerRAF = null;
 let zxingReader = null;
 let scanHandled = false;
-let usingBackupScanner = false;
 let scanContext = 'add';
-let batchScanQueue = [];
-let lastBatchCode = null;
-let lastBatchTime = 0;
-let batchScanLocation = null;
-
-function openBatchLocationPicker(){
-  const sel = document.getElementById('batch-start-location');
-  sel.innerHTML = LOCATIONS.map(l=>`<option>${escapeHtml(l)}</option>`).join('');
-  document.getElementById('batchLocationModal').classList.remove('hidden');
-}
-function closeBatchLocationPicker(){
-  document.getElementById('batchLocationModal').classList.add('hidden');
-}
-function confirmBatchLocationAndScan(){
-  batchScanLocation = document.getElementById('batch-start-location').value;
-  closeBatchLocationPicker();
-  openScanner('batch');
-}
 
 function setScannerStatus(msg){
   const el = document.getElementById('scannerStatus');
@@ -2803,23 +2748,9 @@ function setScannerStatus(msg){
 async function openScanner(context){
   scanContext = context || 'add';
   scanHandled = false;
-  usingBackupScanner = false;
 
-  if(scanContext === 'batch'){
-    batchScanQueue = [];
-    lastBatchCode = null;
-    lastBatchTime = 0;
-    document.getElementById('scannerTitle').textContent = '📷 Scan Multiple Items';
-    document.getElementById('scannerSubtitle').textContent = 'Scanning into: ' + (batchScanLocation || 'Unassigned') + ' — scan barcodes one after another, the camera stays on.';
-    document.getElementById('batchScanPanel').classList.remove('hidden');
-    document.getElementById('scannerDoneBtn').classList.remove('hidden');
-    updateBatchScanUI();
-  } else {
-    document.getElementById('scannerTitle').textContent = '📷 Scan Barcode';
-    document.getElementById('scannerSubtitle').textContent = 'Point your camera at the barcode.';
-    document.getElementById('batchScanPanel').classList.add('hidden');
-    document.getElementById('scannerDoneBtn').classList.add('hidden');
-  }
+  document.getElementById('scannerTitle').textContent = '📷 Scan Barcode';
+  document.getElementById('scannerSubtitle').textContent = 'Point your camera at the barcode.';
 
   document.getElementById('scannerModal').classList.remove('hidden');
   setScannerStatus('Requesting camera access…');
@@ -2875,15 +2806,12 @@ function startNativeDetector(video){
     startZXingFallback(video);
     return;
   }
-  setScannerStatus(scanContext === 'batch' ? 'Ready — scan as many barcodes as you like' : 'Ready — point at a barcode');
+  setScannerStatus('Ready — point at a barcode');
   let consecutiveErrors = 0;
   // Runs a few times a second instead of on every display frame (which can
-  // be 60+ times a second). Nothing about barcode scanning needs that pace
-  // — a person physically holding an item up to the camera can't move
-  // faster than this anyway — but running unthrottled keeps the camera
-  // pipeline and detector under sustained heavy load for as long as batch
-  // mode stays open, which is a very plausible reason a session can lock
-  // up "after a few seconds" even when nothing else is wrong.
+  // be 60+ times a second) — no reason to poll faster than a person can
+  // physically move a barcode into view, and it keeps the camera/detector
+  // pipeline lighter while waiting.
   const SCAN_INTERVAL_MS = 350;
   const scanLoop = async ()=>{
     if(!scannerStream) return;
@@ -2892,9 +2820,6 @@ function startNativeDetector(video){
       consecutiveErrors = 0;
       if(codes.length > 0){
         await handleScanResult(codes[0].rawValue);
-        if(scanContext === 'batch' && scannerStream){
-          scannerRAF = setTimeout(scanLoop, SCAN_INTERVAL_MS);
-        }
         return;
       }
     }catch(err){
@@ -2911,31 +2836,7 @@ function startNativeDetector(video){
   scanLoop();
 }
 
-// Manual override: if the native detector's underlying platform doesn't
-// actually decode a format it claims to support (this varies a lot by
-// browser/OS, especially for Code 39/ITF/Codabar), it just never finds
-// anything — silently, with no error to react to automatically. Rather
-// than guess at a fragile auto-switch timer, this lets the person force
-// the switch themselves, on the same still-running camera stream.
-function forceAlternateScanner(){
-  if(scannerRAF){ clearTimeout(scannerRAF); scannerRAF = null; }
-  if(zxingReader){ try{ zxingReader.reset(); }catch(e){} zxingReader = null; }
-  const video = document.getElementById('scannerVideo');
-  if(!video || !scannerStream) return;
-  const btn = document.getElementById('forceAltScannerBtn');
-  if(btn){ btn.disabled = true; btn.textContent = '🔄 Switching…'; }
-  setScannerStatus('Switching to backup scanner…');
-  startZXingFallback(video);
-  if(btn){
-    setTimeout(function(){
-      btn.disabled = false;
-      btn.textContent = '🔄 Switch scanner again';
-    }, 1200);
-  }
-}
-
 function startZXingFallback(video){
-  usingBackupScanner = true;
   if(window.ZXingBrowser){
     runZXing(video);
     return;
@@ -2954,16 +2855,12 @@ function runZXing(video){
   const scanNext = ()=>{
     try{
       // A fresh reader instance is needed for every scan attempt — reusing
-      // one instance across multiple decodeOnce calls is unreliable and was
-      // the cause of batch scanning silently stopping after the first item.
+      // one instance across multiple decodeOnce calls is unreliable.
       zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
-      setScannerStatus((scanContext === 'batch' ? 'Ready — scan as many barcodes as you like' : 'Ready — point at a barcode') + (usingBackupScanner ? ' (backup scanner active)' : ''));
+      setScannerStatus('Ready — point at a barcode');
       zxingReader.decodeOnceFromVideoElement(video).then(async function(result){
         if(result){
           await handleScanResult(result.getText());
-          if(scanContext === 'batch' && scannerStream){
-            scanNext();
-          }
         }
       }).catch(function(err){
         // Scanner was closed/cancelled before finding a code, or the stream
@@ -2977,28 +2874,6 @@ function runZXing(video){
 }
 
 async function handleScanResult(code){
-  if(scanContext === 'batch'){
-    // Deliberately as close to single-item scan's simplicity as possible:
-    // no format validation, no extra throttling beyond avoiding a double-add
-    // of the same physical barcode still sitting in front of the camera.
-    // Single-item mode has worked reliably every time; batch mode's extra
-    // validation logic added complexity without solving anything, so it's
-    // been removed rather than layered on further.
-    const now = Date.now();
-    if(code === lastBatchCode && (now - lastBatchTime) < 2500){
-      return; // same barcode still in view — don't double-add
-    }
-    lastBatchCode = code;
-    lastBatchTime = now;
-    // Deliberately not awaited: the barcode is queued synchronously inside
-    // addToBatchQueue before any network call happens, so the scan loop can
-    // move on to recognizing the next barcode right away. The product
-    // name/photo lookup (which can be slow on a weak connection) fills in
-    // in the background instead of blocking the camera.
-    addToBatchQueue(code).catch(function(err){ console.warn('Batch scan lookup failed', err); });
-    return;
-  }
-
   if(scanHandled) return;
   scanHandled = true;
   closeScanner();
@@ -3023,147 +2898,6 @@ async function handleScanResult(code){
   }
 
   await lookupProductByBarcode(code);
-}
-
-// ---- Batch barcode scanning ----
-async function addToBatchQueue(code){
-  const existingInBatch = batchScanQueue.find(b=>b.barcode===code);
-  if(existingInBatch){
-    existingInBatch.qty += 1;
-    updateBatchScanUI();
-    return;
-  }
-  const entry = { barcode: code, name: code, category: '', photo: null, qty: 1, found: false, nutrition: null, likelyNonFood: false };
-  batchScanQueue.push(entry);
-  updateBatchScanUI();
-
-  try{
-    const res = await fetch('https://world.openfoodfacts.org/api/v0/product/' + encodeURIComponent(code) + '.json');
-    const data = await res.json();
-    if(data.status === 1 && data.product && data.product.product_name){
-      entry.name = data.product.product_name;
-      entry.category = cleanCategoryFromOFF(data.product) || '';
-      const img = data.product.image_front_url || data.product.image_front_small_url;
-      if(img) entry.photo = img;
-      entry.found = true;
-      entry.nutrition = extractNutritionFromOFF(data.product);
-    } else {
-      // Open Food Facts only covers food products, so a "not found" result
-      // is the expected, normal outcome when batch-scanning household items
-      // like cleaning supplies, paper goods, or personal care — not
-      // necessarily a bad scan. Flagged so the review screen can say so
-      // instead of implying something went wrong.
-      entry.likelyNonFood = true;
-    }
-  }catch(err){
-    // No lookup available for this one — it stays in the queue with just
-    // its barcode as the name, editable in the review step.
-  }
-  updateBatchScanUI();
-}
-
-function updateBatchScanUI(){
-  const countEl = document.getElementById('batchScanCount');
-  const listEl = document.getElementById('batchScanList');
-  if(countEl){
-    countEl.textContent = batchScanQueue.length + ' item' + (batchScanQueue.length===1?'':'s') + ' scanned';
-  }
-  if(listEl){
-    listEl.innerHTML = batchScanQueue.map(b=>{
-      const icon = b.found ? '✅' : (b.likelyNonFood ? '🧴' : '❔');
-      const label = (!b.found && b.likelyNonFood)
-        ? `Barcode captured — not in food database, will need a name (${escapeHtml(b.name)})`
-        : `${escapeHtml(b.name)}${b.qty>1?' ×'+b.qty:''}`;
-      return `<div style="font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border);">${icon} ${label}</div>`;
-    }).join('');
-  }
-}
-
-function finishBatchScan(){
-  closeScanner();
-  if(batchScanQueue.length === 0){
-    showInfo('No barcodes were scanned.', 'ℹ️');
-    return;
-  }
-  showBatchScanReview();
-}
-
-function showBatchScanReview(){
-  const locSel = document.getElementById('batch-location');
-  locSel.innerHTML = LOCATIONS.map(l=>`<option>${escapeHtml(l)}</option>`).join('');
-  if(batchScanLocation) locSel.value = batchScanLocation;
-  const list = document.getElementById('batchReviewList');
-  list.innerHTML = batchScanQueue.map((b,i)=>`
-    <div class="receipt-row" style="align-items:flex-start;">
-      <input type="checkbox" id="br-${i}" checked style="margin-top:10px;">
-      ${b.photo
-        ? `<img src="${b.photo}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;">`
-        : `<div style="width:40px;height:40px;border-radius:8px;background:#eef0f3;flex-shrink:0;display:flex;align-items:center;justify-content:center;">📦</div>`}
-      <div style="flex:1;min-width:0;">
-        <input type="text" id="br-name-${i}" value="${escapeHtml(b.name)}" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:0.88rem;margin-bottom:4px;">
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-          <input type="number" id="br-qty-${i}" value="${b.qty}" min="0" style="width:65px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;" placeholder="Qty">
-          <input type="number" id="br-min-${i}" value="1" min="0" style="width:65px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;" placeholder="Min">
-          ${b.category ? `<span class="entry-tag">${escapeHtml(b.category)}</span>` : ''}
-          ${b.found ? `<span style="font-size:0.72rem;color:var(--green);">🥗 nutrition facts found — available on this item after adding</span>` : ''}
-          ${(!b.found && b.likelyNonFood) ? `<span style="font-size:0.72rem;color:var(--muted);">🧴 no food-database match — likely a household/non-food item. Check the name & category.</span>` : ''}
-          ${(!b.found && !b.likelyNonFood) ? `<span style="font-size:0.72rem;color:var(--muted);">no online match — check the name</span>` : ''}
-        </div>
-      </div>
-    </div>`).join('');
-  document.getElementById('batchReviewModal').classList.remove('hidden');
-}
-
-function closeBatchReviewModal(){
-  document.getElementById('batchReviewModal').classList.add('hidden');
-}
-
-function addBatchItems(){
-  const location = document.getElementById('batch-location').value;
-  let added = 0;
-  batchScanQueue.forEach((b,i)=>{
-    const checkbox = document.getElementById('br-'+i);
-    if(!checkbox || !checkbox.checked) return;
-    const name = document.getElementById('br-name-'+i).value.trim();
-    if(!name) return;
-    const qty = parseFloat(document.getElementById('br-qty-'+i).value) || 0;
-    const min = parseFloat(document.getElementById('br-min-'+i).value) || 0;
-    const item = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-      name,
-      category: b.category || 'Uncategorized',
-      store: null,
-      location,
-      qty,
-      min,
-      skipGrocery: false,
-      unit: '',
-      packSize: null,
-      packUnit: null,
-      packsPerBox: null,
-      boxLabel: null,
-      notes: '',
-      barcode: b.barcode,
-      purchaseDate: null,
-      frozenDate: null,
-      expiryDate: null,
-      photo: b.photo || null,
-      nutrition: b.nutrition || null,
-      favorite: false,
-      price: null
-    };
-    inventory.push(item);
-    checkReorder(item);
-    if(item.photo) savePhotoToLibrary(item.name, item.photo);
-    added++;
-  });
-  closeBatchReviewModal();
-  if(added > 0){
-    logActivity('📷', 'Bulk-scanned ' + added + ' item' + (added===1?'':'s') + ' into ' + location);
-  }
-  save();
-  switchTab('inventory');
-  showInfo(added + ' item' + (added===1?'':'s') + ' added to inventory.', '✅');
 }
 
 function manualBarcodeLookup(){
