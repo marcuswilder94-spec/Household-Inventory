@@ -5208,7 +5208,7 @@ function renderDashboard(){
     const lowItems = inventory.filter(i=>(i.qty <= i.min || i.manuallyLow) && !i.skipGrocery);
     const expiringItems = inventory.filter(i=>i.expiryDate && daysUntil(i.expiryDate) <= appSettings.expirationWarningDays);
     const combined = [];
-    lowItems.forEach(i => combined.push({ item:i, reason: 'Low stock — ' + i.qty + ' left (min ' + i.min + ')', urgent:false }));
+    lowItems.forEach(i => combined.push({ item:i, reason: (i.qty===0 ? 'Out of stock' : ('Low stock — ' + i.qty + ' left (min ' + i.min + ')')), urgent: i.qty===0 }));
     expiringItems.forEach(i => {
       const d = daysUntil(i.expiryDate);
       combined.push({ item:i, reason: d < 0 ? 'Expired ' + Math.abs(d) + 'd ago' : (d===0 ? 'Expires today' : 'Expires in ' + d + 'd'), urgent: d <= 0 });
@@ -5344,7 +5344,7 @@ function render(){
                   : `<button class="inv-fav-btn" onclick="toggleFavorite('${item.id}')" title="${item.favorite?'Remove favorite':'Mark favorite'}">${item.favorite?'⭐':'☆'}</button>`)}
             </div>
             <div class="inv-card-body">
-              <div class="inv-card-name">${escapeHtml(item.name)}${low?'<span class="low-tag">LOW</span>':''}${(low && item.skipGrocery)?'<span class="low-tag" style="background:#eef0f3;color:var(--muted);">NOT ON LIST</span>':''}${expired?'<span class="low-tag" style="background:#fdeeec;color:var(--red);">EXPIRED</span>':(soon?'<span class="low-tag" style="background:#fff4e0;color:var(--amber);">SOON</span>':'')}</div>
+              <div class="inv-card-name">${escapeHtml(item.name)}${item.qty===0?'<span class="low-tag" style="background:#fdeeec;color:var(--red);">OUT</span>':(low?'<span class="low-tag" style="background:#fff4e0;color:var(--amber);">LOW</span>':'')}${(low && item.skipGrocery)?'<span class="low-tag" style="background:#eef0f3;color:var(--muted);">NOT ON LIST</span>':''}${expired?'<span class="low-tag" style="background:#fdeeec;color:var(--red);">EXPIRED</span>':(soon?'<span class="low-tag" style="background:#fff4e0;color:var(--amber);">SOON</span>':'')}</div>
               <div class="inv-card-meta ${low?'low':''}">${escapeHtml(item.category)} · min ${item.min}${item.unit?(' '+escapeHtml(item.unit)):''}</div>
               ${(item.packSize && item.packUnit) ? `<div class="item-notes" style="font-style:normal;display:flex;align-items:center;gap:5px;">${item.photo ? `<img src="${item.photo}" style="width:16px;height:16px;border-radius:3px;object-fit:cover;flex-shrink:0;">` : '📦'} ${item.packSize} ${escapeHtml(item.packUnit)} per ${item.unit ? escapeHtml(item.unit.replace(/s$/,'')) : 'package'} · <strong>${item.qty * item.packSize} ${escapeHtml(item.packUnit)}</strong> on hand total</div>` : ''}
               ${(item.packsPerBox) ? `<div class="item-notes" style="font-style:normal;display:flex;align-items:center;gap:5px;">${item.photo ? `<img src="${item.photo}" style="width:16px;height:16px;border-radius:3px;object-fit:cover;flex-shrink:0;">` : '📦'} ${item.packsPerBox} ${escapeHtml(item.unit || 'packs')} per ${escapeHtml(item.boxLabel || 'box')}</div>` : ''}
