@@ -1719,13 +1719,15 @@ let inventory = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || (SEED
 let grocery = JSON.parse(localStorage.getItem(GROCERY_KEY) || 'null') || (SEED_DATA && SEED_DATA.grocery) || [];
 let photoLibrary = JSON.parse(localStorage.getItem(PHOTO_LIBRARY_KEY) || 'null') || (SEED_DATA && SEED_DATA.photoLibrary) || {};
 let activeFilter = 'All';
-// Per-device only (localStorage, not synced via Firestore) — toggling
-// View Mode on one phone shouldn't force it on everyone else's device.
-let viewOnlyMode = localStorage.getItem('household_view_only_mode') === 'true';
+// Always starts locked, every single time the app opens — Editing is a
+// deliberate, per-session choice (tap the button), not something that
+// stays unlocked from a previous visit. Deliberately NOT read from or
+// written to localStorage, so it can't linger in Editing mode after
+// someone forgets to switch back.
+let viewOnlyMode = true;
 
 function toggleViewOnlyMode(){
   viewOnlyMode = !viewOnlyMode;
-  localStorage.setItem('household_view_only_mode', viewOnlyMode ? 'true' : 'false');
   if(viewOnlyMode && selectMode){
     // Batch select is itself a mutating tool — can't stay active in View Mode.
     selectMode = false;
