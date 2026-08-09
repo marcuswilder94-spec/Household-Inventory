@@ -694,6 +694,14 @@
   padding:20px;
   z-index:100;
 }
+/* Confirm/prompt dialogs are frequently opened from inside another modal
+   that's meant to stay open underneath (e.g. removing a location from
+   within Manage Locations). Stacking by DOM order alone meant they could
+   render invisibly behind whatever was already open. This guarantees they
+   always sit on top, regardless of what else is showing. */
+#confirmModal, #textModal{
+  z-index:110;
+}
 .modal-box{
   background:#fff;
   border-radius:16px;
@@ -3775,6 +3783,11 @@ function closeNutritionModal(){
 // when that form is actually saved, same as a staged photo change).
 function removeNutritionFromItem(){
   const source = nutritionModalSource;
+  // Close this modal BEFORE opening the confirm dialog, not after. Both are
+  // full-screen overlays with the same stacking priority — opening the
+  // confirm dialog while this one was still showing meant it was rendering
+  // silently underneath, invisible until this modal closed.
+  closeNutritionModal();
   openConfirmModal('Remove nutrition facts? This is useful when a barcode scan matched the wrong product — common for non-food items, since the lookup source only covers groceries.', function(ok){
     if(!ok) return;
     if(source && source.type === 'item'){
@@ -3791,7 +3804,6 @@ function removeNutritionFromItem(){
       editPendingNutrition = null;
       document.getElementById('e-nutrition-btn').classList.add('hidden');
     }
-    closeNutritionModal();
   });
 }
 
