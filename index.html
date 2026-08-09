@@ -829,6 +829,7 @@
   <button type="button" onclick="selectAllVisible()">Select All</button>
   <button type="button" onclick="openMoveToLocationModal()">Move</button>
   <button type="button" onclick="openSetCategoryModal()">Category</button>
+  <button type="button" onclick="openSetMinModal()">Min</button>
   <button type="button" class="danger" onclick="deleteSelectedItems()">Delete</button>
   <button type="button" onclick="toggleSelectMode()">Done</button>
 </div>
@@ -1209,6 +1210,19 @@
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" onclick="closeMoveToLocationModal()">Cancel</button>
       <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmMoveSelectedItems()">Move</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="setMinModal">
+  <div class="modal-box" style="max-width:360px;">
+    <h3 style="text-align:center;">🔢 Set Minimum</h3>
+    <p style="text-align:center;" id="setMinCount">Set the minimum quantity for the selected items?</p>
+    <input type="number" id="bulk-min-value" min="0" value="0">
+    <p style="text-align:center;font-size:0.78rem;color:var(--muted);margin-top:8px;">Items are flagged "low" once quantity drops to this number or below. Use 0 for things you only ever keep one of — mark those low manually with the ⚠️ button instead.</p>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeSetMinModal()">Cancel</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmSetMinSelectedItems()">Set Minimum</button>
     </div>
   </div>
 </div>
@@ -5071,6 +5085,36 @@ function confirmSetCategorySelectedItems(){
   inventory.forEach(i => { if(selectedItemIds.has(i.id)) i.category = newCat; });
   logActivity('🏷️', `Set category to "${newCat}" for ${count} item${count===1?'':'s'}`);
   closeSetCategoryModal();
+  selectMode = false;
+  selectedItemIds.clear();
+  save();
+}
+
+function openSetMinModal(){
+  if(selectedItemIds.size===0) return;
+  document.getElementById('bulk-min-value').value = 0;
+  document.getElementById('setMinCount').textContent =
+    `Set the minimum quantity for ${selectedItemIds.size} selected item${selectedItemIds.size===1?'':'s'}?`;
+  document.getElementById('setMinModal').classList.remove('hidden');
+}
+function closeSetMinModal(){
+  document.getElementById('setMinModal').classList.add('hidden');
+}
+function confirmSetMinSelectedItems(){
+  const newMin = parseFloat(document.getElementById('bulk-min-value').value);
+  if(isNaN(newMin) || newMin < 0){
+    showInfo('Enter a valid minimum (0 or higher).', 'ℹ️');
+    return;
+  }
+  const count = selectedItemIds.size;
+  inventory.forEach(i => {
+    if(selectedItemIds.has(i.id)){
+      i.min = newMin;
+      checkReorder(i);
+    }
+  });
+  logActivity('🔢', `Set minimum to ${newMin} for ${count} item${count===1?'':'s'}`);
+  closeSetMinModal();
   selectMode = false;
   selectedItemIds.clear();
   save();
