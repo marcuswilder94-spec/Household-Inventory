@@ -807,6 +807,7 @@
   <p>Every fridge, freezer, pantry, and closet on one list. Scan it in, watch what's running low, and catch what's expiring before it's wasted.</p>
   <button type="button" class="btn-secondary" style="margin-top:10px;" onclick="doSignOut()">Sign Out</button>
   <button type="button" class="btn-secondary" style="margin-top:10px;margin-left:8px;" onclick="openSettings()">⚙️ Settings</button>
+  <button type="button" class="btn-secondary" id="viewModeToggleBtn" style="margin-top:10px;margin-left:8px;" onclick="toggleViewOnlyMode()">🔒 View Only</button>
 </header>
 
 <div class="select-action-bar hidden" id="selectActionBar">
@@ -875,16 +876,16 @@
       <div class="card" style="margin-top:14px;">
         <h3 style="margin:0 0 12px;font-size:1rem;">Quick Actions</h3>
         <div class="dash-actions">
-          <button type="button" class="dash-action-btn" onclick="switchTab('add')">
+          <button type="button" class="dash-action-btn hide-in-view-mode" onclick="switchTab('add')">
             <span class="dash-action-icon">＋</span><span>Add Item</span>
           </button>
-          <button type="button" class="dash-action-btn" onclick="switchTab('add');setTimeout(function(){openScanner('add');},150);">
+          <button type="button" class="dash-action-btn hide-in-view-mode" onclick="switchTab('add');setTimeout(function(){openScanner('add');},150);">
             <span class="dash-action-icon">📷</span><span>Scan Barcode</span>
           </button>
-          <button type="button" class="dash-action-btn" onclick="switchTab('add');setTimeout(function(){openQuickAddLocationModal();},150);">
+          <button type="button" class="dash-action-btn hide-in-view-mode" onclick="switchTab('add');setTimeout(function(){openQuickAddLocationModal();},150);">
             <span class="dash-action-icon">⚡</span><span>Quick Add</span>
           </button>
-          <button type="button" class="dash-action-btn" onclick="switchTab('add');setTimeout(function(){openReceiptScanner();},150);">
+          <button type="button" class="dash-action-btn hide-in-view-mode" onclick="switchTab('add');setTimeout(function(){openReceiptScanner();},150);">
             <span class="dash-action-icon">🧾</span><span>Scan Receipt</span>
           </button>
           <button type="button" class="dash-action-btn" onclick="openTasksModal()">
@@ -908,7 +909,7 @@
 
   <!-- ADD TAB -->
   <section id="tab-add" class="hidden">
-    <div class="card">
+    <div class="card" id="addTabForm">
       <h2>➕ Add an Item</h2>
       <p class="sub">Enter it once. From now on you just adjust the quantity.</p>
 
@@ -1066,6 +1067,10 @@
 
       <button class="primary" onclick="addItem()">Add to Inventory</button>
     </div>
+    <div class="card hidden" id="addTabLocked">
+      <h2>🔒 View Only</h2>
+      <p class="sub">Adding items is turned off while View Mode is on. Tap "View Only" in the header to switch back to Editing.</p>
+    </div>
   </section>
 
   <!-- INVENTORY TAB -->
@@ -1098,19 +1103,19 @@
       </div>
       <div class="btn-row">
         <button class="btn-secondary" onclick="exportBackup()">Export Backup</button>
-        <button class="btn-secondary" onclick="document.getElementById('importFile').click()">Import Backup</button>
+        <button class="btn-secondary hide-in-view-mode" onclick="document.getElementById('importFile').click()">Import Backup</button>
       </div>
       <input type="file" id="importFile" accept="application/json" class="hidden" onchange="importBackup(event)">
       <div class="btn-row">
         <button class="btn-secondary" style="flex:1;" onclick="openDiagnostics()">🩺 Diagnostics & Recovery</button>
       </div>
-      <div class="btn-row">
+      <div class="btn-row hide-in-view-mode">
         <button class="btn-secondary" style="flex:1;" onclick="startFillMissingPhotos()">🖼️ Fill In Missing Photos</button>
       </div>
-      <div class="btn-row">
+      <div class="btn-row hide-in-view-mode">
         <button class="btn-secondary" style="flex:1;" onclick="startPhotoCatchup()">📸 Photo Catch-Up</button>
       </div>
-      <div class="btn-row">
+      <div class="btn-row hide-in-view-mode">
         <button class="btn-danger" onclick="resetInventory()">Reset Inventory</button>
       </div>
     </div>
@@ -1121,9 +1126,9 @@
     <div class="card">
       <h2>🛒 Grocery List</h2>
       <p class="sub">Items land here automatically when they hit their minimum. Check them off as you buy them to restock inventory.</p>
-      <button class="primary" style="margin:0 0 14px;" onclick="openShoppingMode()">🛒 Start Shopping Mode</button>
+      <button class="primary hide-in-view-mode" style="margin:0 0 14px;" onclick="openShoppingMode()">🛒 Start Shopping Mode</button>
       <div id="groceryList"></div>
-      <div class="btn-row">
+      <div class="btn-row hide-in-view-mode">
         <button class="btn-secondary" onclick="clearPurchased()">Restock Checked Items</button>
         <button class="btn-danger" onclick="clearGroceryList()">Clear Grocery List</button>
       </div>
@@ -1665,6 +1670,40 @@ let inventory = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || (SEED
 let grocery = JSON.parse(localStorage.getItem(GROCERY_KEY) || 'null') || (SEED_DATA && SEED_DATA.grocery) || [];
 let photoLibrary = JSON.parse(localStorage.getItem(PHOTO_LIBRARY_KEY) || 'null') || (SEED_DATA && SEED_DATA.photoLibrary) || {};
 let activeFilter = 'All';
+// Per-device only (localStorage, not synced via Firestore) — toggling
+// View Mode on one phone shouldn't force it on everyone else's device.
+let viewOnlyMode = localStorage.getItem('household_view_only_mode') === 'true';
+
+function toggleViewOnlyMode(){
+  viewOnlyMode = !viewOnlyMode;
+  localStorage.setItem('household_view_only_mode', viewOnlyMode ? 'true' : 'false');
+  if(viewOnlyMode && selectMode){
+    // Batch select is itself a mutating tool — can't stay active in View Mode.
+    selectMode = false;
+    selectedItemIds.clear();
+  }
+  render();
+}
+
+function applyViewOnlyModeUI(){
+  const btn = document.getElementById('viewModeToggleBtn');
+  if(btn){
+    btn.textContent = viewOnlyMode ? '✏️ Editing Off — Tap to Enable' : '🔒 View Only';
+    btn.style.background = viewOnlyMode ? 'var(--amber)' : '';
+    btn.style.color = viewOnlyMode ? '#fff' : '';
+  }
+  const selectBtn = document.getElementById('selectModeToggleBtn');
+  if(selectBtn) selectBtn.classList.toggle('hidden', viewOnlyMode);
+
+  const addTabForm = document.getElementById('addTabForm');
+  const addTabLocked = document.getElementById('addTabLocked');
+  if(addTabForm) addTabForm.classList.toggle('hidden', viewOnlyMode);
+  if(addTabLocked) addTabLocked.classList.toggle('hidden', !viewOnlyMode);
+
+  document.querySelectorAll('.hide-in-view-mode').forEach(function(el){
+    el.classList.toggle('hidden', viewOnlyMode);
+  });
+}
 let sortMode = 'favorite';
 let categoryFilter = 'All';
 let selectMode = false;
@@ -4907,6 +4946,7 @@ function renderDashboard(){
 }
 
 function render(){
+  applyViewOnlyModeUI();
   renderHeaderCollage();
   updateAppIcon();
   const groceryActiveCount = grocery.filter(g=>!g.purchased && !g.skipped).length;
@@ -4996,9 +5036,11 @@ function render(){
           <div class="inv-card-top">
             <div class="inv-card-photo">
               ${item.photo ? `<img class="thumb" src="${item.photo}">` : `<div class="noimg">📦</div>`}
-              ${selectMode
-                ? `<div class="checkbox inv-select-checkbox ${isSelected?'checked':''}" onclick="toggleItemSelect('${item.id}')">${isSelected?'✓':''}</div>`
-                : `<button class="inv-fav-btn" onclick="toggleFavorite('${item.id}')" title="${item.favorite?'Remove favorite':'Mark favorite'}">${item.favorite?'⭐':'☆'}</button>`}
+              ${viewOnlyMode
+                ? (item.favorite ? `<span class="inv-fav-btn" style="pointer-events:none;">⭐</span>` : '')
+                : (selectMode
+                  ? `<div class="checkbox inv-select-checkbox ${isSelected?'checked':''}" onclick="toggleItemSelect('${item.id}')">${isSelected?'✓':''}</div>`
+                  : `<button class="inv-fav-btn" onclick="toggleFavorite('${item.id}')" title="${item.favorite?'Remove favorite':'Mark favorite'}">${item.favorite?'⭐':'☆'}</button>`)}
             </div>
             <div class="inv-card-body">
               <div class="inv-card-name">${escapeHtml(item.name)}${low?'<span class="low-tag">LOW</span>':''}${(low && item.skipGrocery)?'<span class="low-tag" style="background:#eef0f3;color:var(--muted);">NOT ON LIST</span>':''}${expired?'<span class="low-tag" style="background:#fdeeec;color:var(--red);">EXPIRED</span>':(soon?'<span class="low-tag" style="background:#fff4e0;color:var(--amber);">SOON</span>':'')}</div>
@@ -5009,7 +5051,16 @@ function render(){
               ${item.notes ? `<div class="item-notes">${escapeHtml(item.notes)}</div>` : ''}
             </div>
           </div>
-          ${selectMode ? `
+          ${viewOnlyMode ? `
+          <div class="inv-card-footer">
+            <div style="display:flex;flex-direction:column;align-items:center;min-width:26px;">
+              <span class="qty-val">${item.qty}</span>
+              ${boxCount ? `<span style="font-size:0.62rem;color:var(--blue);font-weight:700;white-space:nowrap;">= ${boxCount} ${escapeHtml(item.boxLabel || 'box')}${boxCount!==1?'es':''}</span>` : ''}
+            </div>
+            <span class="spacer"></span>
+            ${item.nutrition ? `<button class="icon-btn" onclick="showItemNutrition('${item.id}')" title="Nutrition Facts">🥗</button>` : ''}
+            <span style="font-size:0.72rem;color:var(--muted);">🔒 view only</span>
+          </div>` : selectMode ? `
           <div class="inv-card-footer">
             <button class="btn-secondary" style="width:100%;" onclick="toggleItemSelect('${item.id}')">${isSelected?'✓ Selected — tap to deselect':'Tap to select'}</button>
           </div>` : `
@@ -5043,7 +5094,7 @@ function render(){
 
     const rowHtml = (g, isSkipped) => `
       <div class="grocery-item" style="${isSkipped?'opacity:0.6;':''}">
-        ${!isSkipped ? `<div class="checkbox ${g.purchased?'checked':''}" onclick="toggleGrocery('${g.id}')">${g.purchased?'✓':''}</div>` : `<div style="width:24px;flex-shrink:0;"></div>`}
+        ${!isSkipped ? `<div class="checkbox ${g.purchased?'checked':''}" ${viewOnlyMode ? 'style="opacity:0.5;pointer-events:none;"' : `onclick="toggleGrocery('${g.id}')"`}>${g.purchased?'✓':''}</div>` : `<div style="width:24px;flex-shrink:0;"></div>`}
         ${g.photo ? `<img src="${g.photo}" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;">` : `<div style="width:38px;height:38px;border-radius:8px;background:#eef0f3;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.9rem;">📦</div>`}
         <div style="flex:1;min-width:0;">
           <div class="grocery-name ${g.purchased?'checked':''}">${escapeHtml(g.name)}${g.store ? `<span class="low-tag" style="background:#e7eefc;color:var(--blue);">${escapeHtml(g.store)}</span>` : ''}${g.category ? `<span class="low-tag" style="background:#eef0f3;color:var(--muted);">${escapeHtml(g.category)}</span>` : ''}</div>
