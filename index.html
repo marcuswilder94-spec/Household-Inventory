@@ -1078,6 +1078,9 @@
         <button class="btn-secondary" style="flex:1;" onclick="openDiagnostics()">🩺 Diagnostics & Recovery</button>
       </div>
       <div class="btn-row">
+        <button class="btn-secondary" style="flex:1;" onclick="startFillMissingPhotos()">🖼️ Fill In Missing Photos</button>
+      </div>
+      <div class="btn-row">
         <button class="btn-danger" onclick="resetInventory()">Reset Inventory</button>
       </div>
     </div>
@@ -1420,6 +1423,16 @@
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" onclick="closeDiagnostics()">Close</button>
       <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="exportBackup()">Download Full Backup</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="fillPhotosModal">
+  <div class="modal-box" style="max-width:380px;">
+    <h3 style="text-align:center;">🖼️ Fill In Missing Photos</h3>
+    <p id="fillPhotosStatus" style="text-align:center;">Preparing…</p>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" id="fillPhotosCloseBtn" onclick="closeFillPhotosModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -1993,6 +2006,83 @@ function renderDiagnostics(){
       <div style="font-size:0.82rem;color:var(--muted);">${inventory.length} inventory items · ${grocery.length} grocery list entries · ${LOCATIONS.length} locations · ${activityLog.length} activity log entries · 🧾 receipt scan used ${appSettings.receiptScanCount || 0} time${(appSettings.receiptScanCount||0)===1?'':'s'}</div>
     </div>
   `;
+}
+
+// ---- Fill In Missing Photos ----
+// Checks every item that has a barcode but no photo against three free,
+// open, Creative-Commons-licensed product databases: Open Food Facts
+// (groceries), Open Products Facts (general household/cleaning/paper
+// goods — the exact gap Open Food Facts has), and Open Beauty Facts
+// (personal care). Runs sequentially with a short pause between items to
+// be a polite API citizen, not concurrently.
+let fillPhotosCancelled = false;
+
+function startFillMissingPhotos(){
+  const candidates = inventory.filter(i => i.barcode && !i.photo);
+  if(candidates.length === 0){
+    showInfo('Every item with a barcode already has a photo. Items without a barcode can\'t be looked up this way — add those manually.', 'ℹ️');
+    return;
+  }
+  openConfirmModal(`Check Open Food Facts, Open Products Facts, and Open Beauty Facts for photos of ${candidates.length} item${candidates.length===1?'':'s'} missing one? This can take a minute or two — you can cancel at any time.`, function(ok){
+    if(ok) runFillMissingPhotos(candidates);
+  });
+}
+
+async function lookupPhotoAcrossSources(barcode){
+  const sources = [
+    'https://world.openfoodfacts.org',
+    'https://world.openproductsfacts.org',
+    'https://world.openbeautyfacts.org'
+  ];
+  for(const base of sources){
+    try{
+      const res = await fetch(base + '/api/v0/product/' + encodeURIComponent(barcode) + '.json');
+      const data = await res.json();
+      if(data.status === 1 && data.product){
+        const img = data.product.image_front_url || data.product.image_front_small_url;
+        if(img) return img;
+      }
+    }catch(e){
+      // this source failed or wasn't reachable — try the next one
+    }
+  }
+  return null;
+}
+
+async function runFillMissingPhotos(candidates){
+  fillPhotosCancelled = false;
+  const statusEl = document.getElementById('fillPhotosStatus');
+  const closeBtn = document.getElementById('fillPhotosCloseBtn');
+  closeBtn.textContent = 'Cancel';
+  document.getElementById('fillPhotosModal').classList.remove('hidden');
+
+  let found = 0;
+  let checked = 0;
+  for(const item of candidates){
+    if(fillPhotosCancelled) break;
+    checked++;
+    statusEl.textContent = `Checking ${checked} of ${candidates.length}: ${item.name}…`;
+    const photo = await lookupPhotoAcrossSources(item.barcode);
+    if(photo && !item.photo){
+      item.photo = photo;
+      savePhotoToLibrary(item.name, photo);
+      found++;
+    }
+    // Brief pause between requests — courteous to these free, volunteer-run
+    // APIs, and keeps the UI responsive rather than firing everything at once.
+    await new Promise(function(resolve){ setTimeout(resolve, 300); });
+  }
+
+  save();
+  closeBtn.textContent = 'Done';
+  statusEl.textContent = fillPhotosCancelled
+    ? `Stopped early — found photos for ${found} of ${checked} checked so far. What was found has been saved.`
+    : `Finished — found photos for ${found} of ${checked} item${checked===1?'':'s'} checked. ${checked - found} still need a photo added manually (not every product is in these databases).`;
+}
+
+function closeFillPhotosModal(){
+  fillPhotosCancelled = true;
+  document.getElementById('fillPhotosModal').classList.add('hidden');
 }
 
 function saveLocationPhotos(){
