@@ -857,6 +857,9 @@
           <button type="button" class="dash-action-btn" onclick="switchTab('add');setTimeout(function(){openScanner('add');},150);">
             <span class="dash-action-icon">📷</span><span>Scan Barcode</span>
           </button>
+          <button type="button" class="dash-action-btn" onclick="switchTab('add');setTimeout(function(){openQuickAddLocationModal();},150);">
+            <span class="dash-action-icon">⚡</span><span>Quick Add</span>
+          </button>
           <button type="button" class="dash-action-btn" onclick="switchTab('add');setTimeout(function(){openReceiptScanner();},150);">
             <span class="dash-action-icon">🧾</span><span>Scan Receipt</span>
           </button>
@@ -885,6 +888,8 @@
       <h2>➕ Add an Item</h2>
       <p class="sub">Enter it once. From now on you just adjust the quantity.</p>
 
+      <button type="button" class="btn-secondary" style="width:100%;margin-bottom:8px;background:var(--blue);color:#fff;" onclick="openQuickAddLocationModal()">⚡ Quick Add via Scan (just pick a location)</button>
+      <button type="button" class="btn-secondary" style="width:100%;margin-bottom:8px;" onclick="openBulkScanLocationModal()">📦 Bulk Scan (Beta) — scan several in a row</button>
       <button type="button" class="btn-secondary" style="width:100%;margin-bottom:16px;" onclick="openReceiptScanner()">🧾 Scan a Receipt Instead (bulk add)</button>
 
       <label>Item name</label>
@@ -1146,6 +1151,68 @@
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" onclick="closeMoveToLocationModal()">Cancel</button>
       <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmMoveSelectedItems()">Move</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="bulkScanLocationModal">
+  <div class="modal-box" style="max-width:360px;">
+    <h3 style="text-align:center;">📦 Bulk Scan (Beta)</h3>
+    <p style="text-align:center;">Which location? Scan as many barcodes as you like — review and confirm everything at the end.</p>
+    <select id="bulk-scan-start-location"></select>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeBulkScanLocationModal()">Cancel</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmBulkScanLocationAndStart()">Start Scanning</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="bulkScanModal">
+  <div class="modal-box" style="max-width:420px;">
+    <h3 style="text-align:center;">📦 Bulk Scan (Beta)</h3>
+    <p style="text-align:center;" id="bulkScanSubtitle">Scanning into: —</p>
+    <div id="bulk-reader" style="width:100%;border-radius:12px;overflow:hidden;background:#000;"></div>
+    <div id="bulkScanStatus" style="text-align:center;font-size:0.85rem;color:var(--muted);margin-top:10px;min-height:1.2em;">Starting camera…</div>
+    <div id="bulkScanCount" style="text-align:center;font-weight:700;font-size:0.85rem;margin:8px 0 4px;">0 items scanned</div>
+    <div id="bulkScanList" style="max-height:130px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;"></div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" id="bulkScanCancelBtn" onclick="closeBulkScanner()">Cancel</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" id="bulkScanDoneBtn" onclick="finishBulkScan()">Done Scanning</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="bulkScanReviewModal">
+  <div class="modal-box" style="max-width:460px;text-align:left;max-height:85vh;overflow-y:auto;">
+    <h3 style="text-align:center;">📦 Review Scanned Items</h3>
+    <p style="text-align:center;">Confirm each item, then add them all at once. The food database used for lookup doesn't cover cleaning supplies or other non-food items — those will need their name checked manually below.</p>
+    <div id="bulkScanReviewList" style="margin-top:12px;"></div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeBulkScanReviewModal()">Cancel</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="addBulkScanItems()">Add All to Inventory</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="quickAddLocationModal">
+  <div class="modal-box" style="max-width:360px;">
+    <h3 style="text-align:center;">⚡ Quick Add via Scan</h3>
+    <p style="text-align:center;">Which location? Everything you scan will go straight into inventory there — no form to fill out.</p>
+    <select id="quick-add-location-select"></select>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeQuickAddLocationModal()">Cancel</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmQuickAddLocationAndScan()">Start Scanning</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="quickAddResultModal">
+  <div class="modal-box" style="max-width:360px;">
+    <div class="icon" id="quickAddResultIcon">✅</div>
+    <p id="quickAddResultMsg" style="margin:0 0 20px;"></p>
+    <div class="modal-btns">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeQuickAddResultModal()">Done</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="scanNextQuickAdd()">📷 Scan Next Item</button>
     </div>
   </div>
 </div>
@@ -2751,6 +2818,28 @@ let scannerRAF = null;
 let zxingReader = null;
 let scanHandled = false;
 let scanContext = 'add';
+let quickAddLocation = null;
+
+function openQuickAddLocationModal(){
+  const sel = document.getElementById('quick-add-location-select');
+  sel.innerHTML = LOCATIONS.map(l=>`<option>${escapeHtml(l)}</option>`).join('');
+  document.getElementById('quickAddLocationModal').classList.remove('hidden');
+}
+function closeQuickAddLocationModal(){
+  document.getElementById('quickAddLocationModal').classList.add('hidden');
+}
+function confirmQuickAddLocationAndScan(){
+  quickAddLocation = document.getElementById('quick-add-location-select').value;
+  closeQuickAddLocationModal();
+  openScanner('quickadd');
+}
+function scanNextQuickAdd(){
+  closeQuickAddResultModal();
+  openScanner('quickadd');
+}
+function closeQuickAddResultModal(){
+  document.getElementById('quickAddResultModal').classList.add('hidden');
+}
 
 function setScannerStatus(msg){
   const el = document.getElementById('scannerStatus');
@@ -2761,8 +2850,10 @@ async function openScanner(context){
   scanContext = context || 'add';
   scanHandled = false;
 
-  document.getElementById('scannerTitle').textContent = '📷 Scan Barcode';
-  document.getElementById('scannerSubtitle').textContent = 'Point your camera at the barcode.';
+  document.getElementById('scannerTitle').textContent = scanContext === 'quickadd' ? '⚡ Quick Add via Scan' : '📷 Scan Barcode';
+  document.getElementById('scannerSubtitle').textContent = scanContext === 'quickadd'
+    ? 'Scanning into: ' + (quickAddLocation || 'Unassigned') + ' — added straight to inventory, no form.'
+    : 'Point your camera at the barcode.';
 
   document.getElementById('scannerModal').classList.remove('hidden');
   setScannerStatus('Requesting camera access…');
@@ -2890,6 +2981,11 @@ async function handleScanResult(code){
   scanHandled = true;
   closeScanner();
 
+  if(scanContext === 'quickadd'){
+    await processQuickAddBarcode(code);
+    return;
+  }
+
   if(scanContext === 'edit'){
     document.getElementById('e-barcode').value = code;
     await lookupProductByBarcodeForEdit(code);
@@ -2910,6 +3006,328 @@ async function handleScanResult(code){
   }
 
   await lookupProductByBarcode(code);
+}
+
+// Quick Add: scan a barcode, pick a location, done — no form review. Looks
+// the item up the same way the regular Add flow does, but commits directly
+// to inventory with sensible defaults (qty 1, the account's default min)
+// instead of stopping for a full review. If nothing is found online (common
+// for non-food items, since Open Food Facts only covers groceries), it asks
+// for just a name rather than silently saving a bare barcode number as the
+// item's name.
+async function processQuickAddBarcode(code){
+  const existing = inventory.find(i=>i.barcode===code);
+  if(existing){
+    changeQty(existing.id, 1);
+    logActivity('⚡', 'Quick Add: +1 to "' + existing.name + '" (already tracked)');
+    showQuickAddResult('➕ Already tracked — bumped "' + existing.name + '" to ' + existing.qty + '.', '➕');
+    return;
+  }
+
+  try{
+    const res = await fetch('https://world.openfoodfacts.org/api/v0/product/' + encodeURIComponent(code) + '.json');
+    const data = await res.json();
+    if(data.status === 1 && data.product && data.product.product_name){
+      const p = data.product;
+      const photo = p.image_front_url || p.image_front_small_url || null;
+      commitQuickAddItem(p.product_name, cleanCategoryFromOFF(p) || 'Uncategorized', code, photo, extractNutritionFromOFF(p));
+    } else {
+      promptQuickAddName(code);
+    }
+  }catch(err){
+    promptQuickAddName(code);
+  }
+}
+
+function promptQuickAddName(code){
+  openTextModal('Name this item', 'e.g. Dish Soap, Paper Towels', function(name){
+    if(!name){
+      showQuickAddResult('Skipped — nothing was added for that barcode.', 'ℹ️');
+      return;
+    }
+    commitQuickAddItem(name, 'Uncategorized', code, null, null);
+  }, '', 'Quick Add');
+}
+
+function commitQuickAddItem(name, category, barcode, photo, nutrition){
+  const item = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    name,
+    category: category || 'Uncategorized',
+    store: null,
+    location: quickAddLocation,
+    qty: 1,
+    min: appSettings.defaultMin || 1,
+    skipGrocery: false,
+    unit: '',
+    packSize: null,
+    packUnit: null,
+    packsPerBox: null,
+    boxLabel: null,
+    notes: '',
+    barcode,
+    purchaseDate: null,
+    frozenDate: null,
+    expiryDate: null,
+    photo: photo || null,
+    nutrition: nutrition || null,
+    favorite: false,
+    price: null
+  };
+  inventory.push(item);
+  checkReorder(item);
+  if(item.photo) savePhotoToLibrary(item.name, item.photo);
+  logActivity('⚡', 'Quick Added "' + name + '" to ' + quickAddLocation);
+  save();
+  showQuickAddResult('✅ Added "' + name + '" to ' + quickAddLocation + '.', '✅');
+}
+
+function showQuickAddResult(message, icon){
+  document.getElementById('quickAddResultMsg').textContent = message;
+  document.getElementById('quickAddResultIcon').textContent = icon || '✅';
+  document.getElementById('quickAddResultModal').classList.remove('hidden');
+}
+
+// ---- Bulk Scan (Beta) — uses the html5-qrcode library's low-level
+// Html5Qrcode class (not its pre-built widget, so our own modal/UI stays
+// intact). Deliberately kept fully separate from the single-scan and
+// Quick Add code above: separate state variables, separate functions, no
+// shared globals — so nothing here can affect what already works.
+let bulkScanQueue = [];
+let bulkScanLocation = null;
+let bulkLastCode = null;
+let bulkLastTime = 0;
+let html5QrCodeInstance = null;
+
+function openBulkScanLocationModal(){
+  const sel = document.getElementById('bulk-scan-start-location');
+  sel.innerHTML = LOCATIONS.map(l=>`<option>${escapeHtml(l)}</option>`).join('');
+  document.getElementById('bulkScanLocationModal').classList.remove('hidden');
+}
+function closeBulkScanLocationModal(){
+  document.getElementById('bulkScanLocationModal').classList.add('hidden');
+}
+function confirmBulkScanLocationAndStart(){
+  bulkScanLocation = document.getElementById('bulk-scan-start-location').value;
+  closeBulkScanLocationModal();
+  startBulkScan();
+}
+
+function loadHtml5QrcodeLib(callback){
+  if(window.Html5Qrcode){ callback(); return; }
+  const script = document.createElement('script');
+  script.src = 'https://unpkg.com/html5-qrcode';
+  script.onload = callback;
+  script.onerror = function(){
+    const el = document.getElementById('bulkScanStatus');
+    if(el) el.textContent = 'Could not load the scanner library — check your internet connection.';
+  };
+  document.head.appendChild(script);
+}
+
+function startBulkScan(){
+  bulkScanQueue = [];
+  bulkLastCode = null;
+  bulkLastTime = 0;
+  document.getElementById('bulkScanSubtitle').textContent = 'Scanning into: ' + (bulkScanLocation || 'Unassigned');
+  document.getElementById('bulkScanStatus').textContent = 'Loading scanner…';
+  updateBulkScanUI();
+  document.getElementById('bulkScanModal').classList.remove('hidden');
+
+  loadHtml5QrcodeLib(function(){
+    try{
+      html5QrCodeInstance = new Html5Qrcode('bulk-reader');
+      const config = {
+        fps: 10,
+        qrbox: { width: 260, height: 160 },
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.CODABAR
+        ]
+      };
+      html5QrCodeInstance.start(
+        { facingMode: 'environment' },
+        config,
+        onBulkScanSuccess,
+        function(){ /* per-frame "nothing found yet" — expected constantly, ignore */ }
+      ).then(function(){
+        document.getElementById('bulkScanStatus').textContent = 'Ready — scan as many barcodes as you like';
+      }).catch(function(err){
+        document.getElementById('bulkScanStatus').textContent = 'Could not start the camera (' + (err && err.message ? err.message : 'unknown error') + '). Try Cancel and reopen, or check camera permissions.';
+      });
+    }catch(err){
+      document.getElementById('bulkScanStatus').textContent = 'The bulk scanner could not start on this device.';
+    }
+  });
+}
+
+// The key improvement over our earlier hand-rolled loop: explicitly pause
+// the library's own decode loop while a result is being processed, then
+// explicitly resume it — a documented pattern from the library itself for
+// avoiding duplicate/overlapping scans, rather than a debounce timer we
+// have to get exactly right ourselves.
+async function onBulkScanSuccess(decodedText){
+  if(!html5QrCodeInstance) return;
+  const code = (decodedText || '').trim();
+  if(!code) return;
+
+  const now = Date.now();
+  if(code === bulkLastCode && (now - bulkLastTime) < 2500){
+    return; // same barcode still in view — ignore
+  }
+  bulkLastCode = code;
+  bulkLastTime = now;
+
+  try{ html5QrCodeInstance.pause(true); }catch(e){}
+  await addToBulkScanQueue(code);
+  try{ if(html5QrCodeInstance) html5QrCodeInstance.resume(); }catch(e){}
+}
+
+async function addToBulkScanQueue(code){
+  const existing = bulkScanQueue.find(b=>b.barcode===code);
+  if(existing){
+    existing.qty += 1;
+    updateBulkScanUI();
+    return;
+  }
+  const entry = { barcode: code, name: code, category: '', photo: null, qty: 1, found: false, nutrition: null, likelyNonFood: false };
+  bulkScanQueue.push(entry);
+  updateBulkScanUI();
+
+  try{
+    const res = await fetch('https://world.openfoodfacts.org/api/v0/product/' + encodeURIComponent(code) + '.json');
+    const data = await res.json();
+    if(data.status === 1 && data.product && data.product.product_name){
+      entry.name = data.product.product_name;
+      entry.category = cleanCategoryFromOFF(data.product) || '';
+      const img = data.product.image_front_url || data.product.image_front_small_url;
+      if(img) entry.photo = img;
+      entry.found = true;
+      entry.nutrition = extractNutritionFromOFF(data.product);
+    } else {
+      entry.likelyNonFood = true;
+    }
+  }catch(err){
+    // stays in queue with the barcode as a placeholder name — editable in review
+  }
+  updateBulkScanUI();
+}
+
+function updateBulkScanUI(){
+  const countEl = document.getElementById('bulkScanCount');
+  const listEl = document.getElementById('bulkScanList');
+  if(countEl){
+    countEl.textContent = bulkScanQueue.length + ' item' + (bulkScanQueue.length===1?'':'s') + ' scanned';
+  }
+  if(listEl){
+    listEl.innerHTML = bulkScanQueue.map(b=>{
+      const icon = b.found ? '✅' : (b.likelyNonFood ? '🧴' : '❔');
+      const label = (!b.found && b.likelyNonFood)
+        ? `Barcode captured — not in food database, will need a name (${escapeHtml(b.name)})`
+        : `${escapeHtml(b.name)}${b.qty>1?' ×'+b.qty:''}`;
+      return `<div style="font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border);">${icon} ${label}</div>`;
+    }).join('');
+  }
+}
+
+function stopBulkScanCamera(callback){
+  if(html5QrCodeInstance){
+    const instance = html5QrCodeInstance;
+    html5QrCodeInstance = null;
+    instance.stop().then(function(){
+      if(callback) callback();
+    }).catch(function(){
+      if(callback) callback();
+    });
+  } else {
+    if(callback) callback();
+  }
+}
+
+function closeBulkScanner(){
+  stopBulkScanCamera(function(){
+    document.getElementById('bulkScanModal').classList.add('hidden');
+  });
+}
+
+function finishBulkScan(){
+  stopBulkScanCamera(function(){
+    document.getElementById('bulkScanModal').classList.add('hidden');
+    showBulkScanReview();
+  });
+}
+
+function showBulkScanReview(){
+  const list = document.getElementById('bulkScanReviewList');
+  if(bulkScanQueue.length === 0){
+    list.innerHTML = '<p style="text-align:center;color:var(--muted);">Nothing was scanned.</p>';
+  } else {
+    list.innerHTML = bulkScanQueue.map((b,i)=>`
+      <div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;">
+        <input type="text" id="brs-name-${i}" value="${escapeHtml(b.name)}" style="width:100%;margin-bottom:6px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label style="font-size:0.78rem;color:var(--muted);">Qty</label>
+          <input type="number" id="brs-qty-${i}" value="${b.qty}" min="1" style="width:70px;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);">
+          ${b.category ? `<span class="entry-tag">${escapeHtml(b.category)}</span>` : ''}
+        </div>
+        ${b.found ? `<div style="font-size:0.72rem;color:var(--green);margin-top:4px;">🥗 nutrition facts found — available on this item after adding</div>` : ''}
+        ${(!b.found && b.likelyNonFood) ? `<div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">🧴 no food-database match — likely a household item. Check the name.</div>` : ''}
+        ${(!b.found && !b.likelyNonFood) ? `<div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">no online match — check the name</div>` : ''}
+      </div>
+    `).join('');
+  }
+  document.getElementById('bulkScanReviewModal').classList.remove('hidden');
+}
+function closeBulkScanReviewModal(){
+  document.getElementById('bulkScanReviewModal').classList.add('hidden');
+}
+
+function addBulkScanItems(){
+  let added = 0;
+  bulkScanQueue.forEach(function(b, i){
+    const nameInput = document.getElementById('brs-name-' + i);
+    const qtyInput = document.getElementById('brs-qty-' + i);
+    const name = nameInput ? nameInput.value.trim() : b.name;
+    const qty = qtyInput ? (parseFloat(qtyInput.value) || 1) : b.qty;
+    if(!name) return;
+    inventory.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6) + i,
+      name: name,
+      category: b.category || 'Uncategorized',
+      store: null,
+      location: bulkScanLocation,
+      qty: qty,
+      min: appSettings.defaultMin || 1,
+      skipGrocery: false,
+      unit: '',
+      packSize: null,
+      packUnit: null,
+      packsPerBox: null,
+      boxLabel: null,
+      notes: '',
+      barcode: b.barcode,
+      purchaseDate: null,
+      frozenDate: null,
+      expiryDate: null,
+      photo: b.photo || null,
+      nutrition: b.nutrition || null,
+      favorite: false,
+      price: null
+    });
+    added++;
+  });
+  closeBulkScanReviewModal();
+  logActivity('📦', 'Bulk scanned ' + added + ' item' + (added===1?'':'s') + ' into ' + bulkScanLocation);
+  save();
+  switchTab('inventory');
+  showInfo(added + ' item' + (added===1?'':'s') + ' added to inventory.', '✅');
 }
 
 function manualBarcodeLookup(){
