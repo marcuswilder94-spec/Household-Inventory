@@ -403,6 +403,22 @@
     border:1px solid var(--border);
     flex-shrink:0;
   }
+  .photo-dropzone{
+    border:2px dashed var(--border);
+    border-radius:12px;
+    padding:10px;
+    transition:border-color 0.15s, background 0.15s;
+  }
+  .photo-dropzone.drag-active{
+    border-color:var(--blue);
+    background:rgba(47,111,237,0.08);
+  }
+  .photo-dropzone-hint{
+    font-size:0.72rem;
+    color:var(--muted);
+    text-align:center;
+    margin-top:6px;
+  }
   .photo-btn{
     flex:1;
     padding:12px;
@@ -1015,24 +1031,27 @@
       <input type="date" id="f-expiry-date">
 
       <label>Photo of the exact product</label>
-      <div class="photo-input">
-        <img id="f-photo-preview" class="photo-preview hidden">
+      <div class="photo-dropzone" id="f-photo-dropzone">
+        <div class="photo-input">
+          <img id="f-photo-preview" class="photo-preview hidden">
+        </div>
+        <button type="button" id="f-photo-remove-btn" class="btn-secondary hidden" style="width:100%;margin-top:6px;font-size:0.82rem;" onclick="removeAddPhoto()">✕ Remove this photo</button>
+        <div id="f-photo-choice" class="hidden" style="margin:10px 0;display:flex;flex-direction:column;gap:8px;">
+          <div class="item-notes" style="margin-bottom:2px;">✓ Found a saved photo for this item — what would you like to do?</div>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
+            <input type="radio" name="f-photo-radio" id="f-photo-keep" value="keep" onchange="handleAddPhotoChoice('keep')"> Use the saved photo
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
+            <input type="radio" name="f-photo-radio" value="new" onchange="handleAddPhotoChoice('new')"> Take/choose a new photo
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
+            <input type="radio" name="f-photo-radio" value="none" onchange="handleAddPhotoChoice('none')"> No photo
+          </label>
+        </div>
+        <label class="photo-btn" id="f-photo-label">📷 Add Photo</label>
+        <input type="file" accept="image/*" id="f-photo" class="hidden">
+        <div class="photo-dropzone-hint">or drag a photo here</div>
       </div>
-      <button type="button" id="f-photo-remove-btn" class="btn-secondary hidden" style="width:100%;margin-top:6px;font-size:0.82rem;" onclick="removeAddPhoto()">✕ Remove this photo</button>
-      <div id="f-photo-choice" class="hidden" style="margin:10px 0;display:flex;flex-direction:column;gap:8px;">
-        <div class="item-notes" style="margin-bottom:2px;">✓ Found a saved photo for this item — what would you like to do?</div>
-        <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
-          <input type="radio" name="f-photo-radio" id="f-photo-keep" value="keep" onchange="handleAddPhotoChoice('keep')"> Use the saved photo
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
-          <input type="radio" name="f-photo-radio" value="new" onchange="handleAddPhotoChoice('new')"> Take/choose a new photo
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
-          <input type="radio" name="f-photo-radio" value="none" onchange="handleAddPhotoChoice('none')"> No photo
-        </label>
-      </div>
-      <label class="photo-btn" id="f-photo-label">📷 Add Photo</label>
-      <input type="file" accept="image/*" id="f-photo" class="hidden">
 
       <label>Notes (optional)</label>
       <textarea id="f-notes" placeholder="Brand, size, where exactly it sits, etc."></textarea>
@@ -1079,6 +1098,9 @@
       </div>
       <div class="btn-row">
         <button class="btn-secondary" style="flex:1;" onclick="startFillMissingPhotos()">🖼️ Fill In Missing Photos</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn-secondary" style="flex:1;" onclick="startPhotoCatchup()">📸 Photo Catch-Up</button>
       </div>
       <div class="btn-row">
         <button class="btn-danger" onclick="resetInventory()">Reset Inventory</button>
@@ -1437,6 +1459,27 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="photoCatchupModal">
+  <div class="modal-box" style="max-width:380px;">
+    <h3 style="text-align:center;">📸 Photo Catch-Up</h3>
+    <p id="catchupProgress" style="text-align:center;font-weight:700;font-size:0.85rem;margin-bottom:2px;"></p>
+    <p id="catchupItemName" style="text-align:center;font-size:1.1rem;font-weight:700;margin:0 0 2px;"></p>
+    <p id="catchupItemLocation" style="text-align:center;font-size:0.8rem;color:var(--muted);margin-bottom:12px;"></p>
+    <div class="photo-dropzone" id="catchupDropzone">
+      <div class="photo-input" style="justify-content:center;">
+        <img id="catchupPreview" class="photo-preview hidden" style="width:110px;height:110px;">
+      </div>
+      <label class="photo-btn" id="catchupPhotoLabel" style="display:block;text-align:center;margin-top:8px;">📷 Take/Choose Photo</label>
+      <input type="file" accept="image/*" id="catchupPhotoInput" class="hidden">
+      <div class="photo-dropzone-hint">or drag a photo here</div>
+    </div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="skipPhotoCatchup()">Skip</button>
+      <button class="modal-btn-no" style="flex:1;" onclick="closePhotoCatchup()">Close for now</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="nutritionModal">
   <div class="modal-box" style="max-width:380px;text-align:left;max-height:85vh;overflow-y:auto;">
     <h3 id="nutrition-modal-title" style="text-align:center;">🥗 Nutrition Facts</h3>
@@ -1567,22 +1610,25 @@
     <input type="date" id="e-expiry-date">
 
     <label>Photo of the exact product</label>
-    <div class="photo-input">
-      <img id="e-photo-preview" class="photo-preview hidden">
+    <div class="photo-dropzone" id="e-photo-dropzone">
+      <div class="photo-input">
+        <img id="e-photo-preview" class="photo-preview hidden">
+      </div>
+      <div id="e-photo-choice" class="hidden" style="margin:10px 0;display:flex;flex-direction:column;gap:8px;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
+          <input type="radio" name="e-photo-radio" id="e-photo-keep" value="keep" onchange="handleEditPhotoChoice('keep')"> Keep current photo
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
+          <input type="radio" name="e-photo-radio" value="new" onchange="handleEditPhotoChoice('new')"> Upload a new photo
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
+          <input type="radio" name="e-photo-radio" value="none" onchange="handleEditPhotoChoice('none')"> No photo
+        </label>
+      </div>
+      <label class="photo-btn hidden" id="e-photo-label">📷 Add Photo</label>
+      <input type="file" accept="image/*" id="e-photo" class="hidden">
+      <div class="photo-dropzone-hint">or drag a photo here</div>
     </div>
-    <div id="e-photo-choice" class="hidden" style="margin:10px 0;display:flex;flex-direction:column;gap:8px;">
-      <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
-        <input type="radio" name="e-photo-radio" id="e-photo-keep" value="keep" onchange="handleEditPhotoChoice('keep')"> Keep current photo
-      </label>
-      <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
-        <input type="radio" name="e-photo-radio" value="new" onchange="handleEditPhotoChoice('new')"> Upload a new photo
-      </label>
-      <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
-        <input type="radio" name="e-photo-radio" value="none" onchange="handleEditPhotoChoice('none')"> No photo
-      </label>
-    </div>
-    <label class="photo-btn hidden" id="e-photo-label">📷 Add Photo</label>
-    <input type="file" accept="image/*" id="e-photo" class="hidden">
 
     <label>Notes (optional)</label>
     <textarea id="e-notes" placeholder="Brand, size, where exactly it sits, etc."></textarea>
@@ -2901,6 +2947,117 @@ document.getElementById('e-photo').addEventListener('change', function(e){
   reader.onload = function(ev){ setEditPhotoFromSrc(ev.target.result); };
   reader.readAsDataURL(file);
 });
+
+// ---- Drag-and-drop for photo areas ----
+// Shared by the Add form, Edit form, and the Photo Catch-Up queue below.
+// Reads a dropped image file the same way the existing file-picker inputs
+// already do (FileReader -> data URL), then hands it to a callback so each
+// caller can decide what to do with it — set as pending photo, replace an
+// existing item's photo, etc.
+function handleDroppedImageFile(file, onReady){
+  if(!file || !file.type || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){ onReady(ev.target.result); };
+  reader.readAsDataURL(file);
+}
+
+function setupPhotoDropZone(zoneId, onReady){
+  const zone = document.getElementById(zoneId);
+  if(!zone) return;
+  zone.addEventListener('dragover', function(e){
+    e.preventDefault();
+    zone.classList.add('drag-active');
+  });
+  zone.addEventListener('dragleave', function(){
+    zone.classList.remove('drag-active');
+  });
+  zone.addEventListener('drop', function(e){
+    e.preventDefault();
+    zone.classList.remove('drag-active');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if(file) handleDroppedImageFile(file, onReady);
+  });
+}
+
+setupPhotoDropZone('f-photo-dropzone', function(dataUrl){
+  setPhotoFromSrc(dataUrl, false);
+  const newRadio = document.querySelector('input[name="f-photo-radio"][value="new"]');
+  if(newRadio) newRadio.checked = true;
+});
+
+setupPhotoDropZone('e-photo-dropzone', function(dataUrl){
+  setEditPhotoFromSrc(dataUrl);
+});
+
+// ---- Photo Catch-Up ----
+// A guided, one-at-a-time queue through every inventory item missing a
+// photo (regardless of whether it has a barcode — unlike Fill In Missing
+// Photos, which can only look up items that do). Sorted by location so a
+// person can walk room to room taking photos in one pass. Fully manual by
+// necessity (a camera still has to be pointed at the real product), but
+// removes all the navigation/searching around that part.
+let photoCatchupQueue = [];
+let photoCatchupIndex = 0;
+
+function startPhotoCatchup(){
+  photoCatchupQueue = inventory
+    .filter(function(i){ return !i.photo; })
+    .sort(function(a,b){ return a.location.localeCompare(b.location) || a.name.localeCompare(b.name); });
+  if(photoCatchupQueue.length === 0){
+    showInfo('Every item already has a photo!', '✅');
+    return;
+  }
+  photoCatchupIndex = 0;
+  document.getElementById('photoCatchupModal').classList.remove('hidden');
+  renderPhotoCatchupStep();
+}
+
+function renderPhotoCatchupStep(){
+  if(photoCatchupIndex >= photoCatchupQueue.length){
+    closePhotoCatchup();
+    showInfo('All done — you\'ve been through every item missing a photo.', '✅');
+    return;
+  }
+  const item = photoCatchupQueue[photoCatchupIndex];
+  document.getElementById('catchupProgress').textContent = 'Item ' + (photoCatchupIndex + 1) + ' of ' + photoCatchupQueue.length;
+  document.getElementById('catchupItemName').textContent = item.name;
+  document.getElementById('catchupItemLocation').textContent = item.location || '';
+  document.getElementById('catchupPreview').classList.add('hidden');
+  document.getElementById('catchupPhotoInput').value = '';
+}
+
+function skipPhotoCatchup(){
+  photoCatchupIndex++;
+  renderPhotoCatchupStep();
+}
+
+function closePhotoCatchup(){
+  document.getElementById('photoCatchupModal').classList.add('hidden');
+}
+
+function savePhotoCatchupResult(dataUrl){
+  const item = photoCatchupQueue[photoCatchupIndex];
+  if(!item) return;
+  resizeImage(dataUrl, function(resized){
+    item.photo = resized;
+    savePhotoToLibrary(item.name, resized);
+    save();
+    photoCatchupIndex++;
+    renderPhotoCatchupStep();
+  });
+}
+
+document.getElementById('catchupPhotoLabel').addEventListener('click', function(){
+  document.getElementById('catchupPhotoInput').click();
+});
+document.getElementById('catchupPhotoInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){ savePhotoCatchupResult(ev.target.result); };
+  reader.readAsDataURL(file);
+});
+setupPhotoDropZone('catchupDropzone', savePhotoCatchupResult);
 
 // ---- Barcode scanning ----
 let scannerStream = null;
