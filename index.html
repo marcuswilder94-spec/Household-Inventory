@@ -917,7 +917,7 @@
         <button type="button" class="photo-btn" style="flex:0 0 auto;padding:12px 14px;" id="f-barcode-lookup-btn" onclick="manualBarcodeLookup()">🔍 Look Up</button>
         <button type="button" class="photo-btn" style="flex:0 0 auto;padding:12px 16px;" onclick="openScanner()">📷 Scan</button>
       </div>
-      <button type="button" class="btn-secondary hidden" id="f-nutrition-btn" style="width:100%;margin-top:8px;" onclick="openNutritionModal(pendingNutrition, document.getElementById('f-name').value)">🥗 View Nutrition Facts</button>
+      <button type="button" class="btn-secondary hidden" id="f-nutrition-btn" style="width:100%;margin-top:8px;" onclick="openNutritionModal(pendingNutrition, document.getElementById('f-name').value, {type:'add'})">🥗 View Nutrition Facts</button>
 
       <label>Category</label>
       <select id="f-category" onchange="document.getElementById('f-category-other').classList.toggle('hidden', this.value !== 'Other')">
@@ -1486,6 +1486,7 @@
     <div id="nutrition-modal-body"></div>
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" onclick="closeNutritionModal()" style="flex:1;">Close</button>
+      <button class="modal-btn-no" onclick="removeNutritionFromItem()" style="flex:1;color:var(--red);">✕ Remove</button>
     </div>
   </div>
 </div>
@@ -1503,7 +1504,7 @@
       <button type="button" class="photo-btn" style="flex:0 0 auto;padding:12px 14px;" id="e-barcode-lookup-btn" onclick="manualBarcodeLookupEdit()">🔍 Look Up</button>
       <button type="button" class="photo-btn" style="flex:0 0 auto;padding:12px 16px;" onclick="openScanner('edit')">📷 Scan</button>
     </div>
-    <button type="button" class="btn-secondary hidden" id="e-nutrition-btn" style="width:100%;margin-top:8px;" onclick="openNutritionModal(editPendingNutrition, document.getElementById('e-name').value)">🥗 View Nutrition Facts</button>
+    <button type="button" class="btn-secondary hidden" id="e-nutrition-btn" style="width:100%;margin-top:8px;" onclick="openNutritionModal(editPendingNutrition, document.getElementById('e-name').value, {type:'edit'})">🥗 View Nutrition Facts</button>
 
     <label>Category</label>
     <select id="e-category" onchange="document.getElementById('e-category-other').classList.toggle('hidden', this.value !== 'Other')">
@@ -3732,23 +3733,55 @@ function extractNutritionFromOFF(product){
 }
 
 // ---- Nutrition Facts modal ----
+let nutritionModalSource = null;
+
 function showItemNutrition(id){
   const item = inventory.find(i=>i.id===id);
   if(!item) return;
-  openNutritionModal(item.nutrition, item.name);
+  openNutritionModal(item.nutrition, item.name, {type:'item', id:id});
 }
 
-function openNutritionModal(nutrition, name){
+function openNutritionModal(nutrition, name, source){
   if(!nutrition){
     showInfo('No nutrition data was found for this item.', 'ℹ️');
     return;
   }
+  nutritionModalSource = source || null;
   document.getElementById('nutrition-modal-title').textContent = '🥗 ' + (name || 'Nutrition Facts');
   document.getElementById('nutrition-modal-body').innerHTML = renderNutritionFacts(nutrition);
   document.getElementById('nutritionModal').classList.remove('hidden');
 }
 function closeNutritionModal(){
   document.getElementById('nutritionModal').classList.add('hidden');
+  nutritionModalSource = null;
+}
+
+// Handles all three places the nutrition modal can be opened from: a
+// saved inventory item (clears and saves immediately — common when a
+// barcode scan matched the wrong product, which happens more often for
+// non-food items since the lookup source only covers groceries), or a
+// still-open Add/Edit form (just clears the staged value — takes effect
+// when that form is actually saved, same as a staged photo change).
+function removeNutritionFromItem(){
+  const source = nutritionModalSource;
+  openConfirmModal('Remove nutrition facts? This is useful when a barcode scan matched the wrong product — common for non-food items, since the lookup source only covers groceries.', function(ok){
+    if(!ok) return;
+    if(source && source.type === 'item'){
+      const item = inventory.find(i=>i.id===source.id);
+      if(item){
+        item.nutrition = null;
+        logActivity('🥗', 'Removed nutrition facts from "' + item.name + '"');
+        save();
+      }
+    } else if(source && source.type === 'add'){
+      pendingNutrition = null;
+      document.getElementById('f-nutrition-btn').classList.add('hidden');
+    } else if(source && source.type === 'edit'){
+      editPendingNutrition = null;
+      document.getElementById('e-nutrition-btn').classList.add('hidden');
+    }
+    closeNutritionModal();
+  });
 }
 
 function fmtNutrient(val, unit, decimals){
