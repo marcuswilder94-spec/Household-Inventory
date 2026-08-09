@@ -828,6 +828,7 @@
   <span class="sab-count" id="selectActionCount">0 selected</span>
   <button type="button" onclick="selectAllVisible()">Select All</button>
   <button type="button" onclick="openMoveToLocationModal()">Move</button>
+  <button type="button" onclick="openSetCategoryModal()">Category</button>
   <button type="button" class="danger" onclick="deleteSelectedItems()">Delete</button>
   <button type="button" onclick="toggleSelectMode()">Done</button>
 </div>
@@ -1208,6 +1209,42 @@
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" onclick="closeMoveToLocationModal()">Cancel</button>
       <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmMoveSelectedItems()">Move</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="setCategoryModal">
+  <div class="modal-box" style="max-width:360px;">
+    <h3 style="text-align:center;">🏷️ Set Category</h3>
+    <p style="text-align:center;" id="setCategoryCount">Assign which category to the selected items?</p>
+    <select id="bulk-cat-category" onchange="document.getElementById('bulk-cat-category-other').classList.toggle('hidden', this.value !== 'Other')">
+      <option value="">Select a category…</option>
+      <option>Meat</option>
+      <option>Poultry</option>
+      <option>Seafood</option>
+      <option>Dairy &amp; Eggs</option>
+      <option>Produce</option>
+      <option>Frozen Foods</option>
+      <option>Bread &amp; Bakery</option>
+      <option>Pantry &amp; Dry Goods</option>
+      <option>Canned Goods</option>
+      <option>Snacks</option>
+      <option>Beverages</option>
+      <option>Condiments &amp; Sauces</option>
+      <option>Baking Supplies</option>
+      <option>Spices &amp; Seasonings</option>
+      <option>Paper Goods</option>
+      <option>Cleaning Supplies</option>
+      <option>Personal Care</option>
+      <option>Baby Items</option>
+      <option>Pet Supplies</option>
+      <option>Household Supplies</option>
+      <option value="Other">Other (type your own)</option>
+    </select>
+    <input type="text" id="bulk-cat-category-other" class="hidden" placeholder="Type your own category" style="margin-top:8px;" list="customCategorySuggestions">
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeSetCategoryModal()">Cancel</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmSetCategorySelectedItems()">Set Category</button>
     </div>
   </div>
 </div>
@@ -5009,6 +5046,31 @@ function confirmMoveSelectedItems(){
   inventory.forEach(i => { if(selectedItemIds.has(i.id)) i.location = newLoc; });
   logActivity('📦', `Moved ${count} item${count===1?'':'s'} to ${newLoc}`);
   closeMoveToLocationModal();
+  selectMode = false;
+  selectedItemIds.clear();
+  save();
+}
+
+function openSetCategoryModal(){
+  if(selectedItemIds.size===0) return;
+  setCategoryField('bulk-cat', '');
+  document.getElementById('setCategoryCount').textContent =
+    `Assign which category to ${selectedItemIds.size} selected item${selectedItemIds.size===1?'':'s'}?`;
+  document.getElementById('setCategoryModal').classList.remove('hidden');
+}
+function closeSetCategoryModal(){
+  document.getElementById('setCategoryModal').classList.add('hidden');
+}
+function confirmSetCategorySelectedItems(){
+  const newCat = getCategoryFieldValue('bulk-cat');
+  if(!newCat){
+    showInfo('Pick a category first.', 'ℹ️');
+    return;
+  }
+  const count = selectedItemIds.size;
+  inventory.forEach(i => { if(selectedItemIds.has(i.id)) i.category = newCat; });
+  logActivity('🏷️', `Set category to "${newCat}" for ${count} item${count===1?'':'s'}`);
+  closeSetCategoryModal();
   selectMode = false;
   selectedItemIds.clear();
   save();
