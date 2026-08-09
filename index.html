@@ -1981,7 +1981,12 @@ function saveSettingsFromModal(){
   appSettings.darkMode = document.getElementById('set-dark-mode').checked;
   appSettings.expirationWarningDays = parseFloat(document.getElementById('set-exp-days').value) || 7;
   appSettings.defaultStore = document.getElementById('set-default-store').value || '';
-  appSettings.defaultMin = parseFloat(document.getElementById('set-default-min').value) || 1;
+  // Using isNaN instead of || here on purpose — 0 is a valid, intentional
+  // default minimum (e.g. for single-item products), but 0 || 1 evaluates
+  // to 1 in JavaScript since 0 is falsy, which was silently reverting a
+  // saved "0" back to 1 every time.
+  const parsedMin = parseFloat(document.getElementById('set-default-min').value);
+  appSettings.defaultMin = isNaN(parsedMin) ? 1 : parsedMin;
   saveSettings();
   closeSettings();
 }
@@ -3305,7 +3310,10 @@ function commitQuickAddItem(name, category, barcode, photo, nutrition){
     store: null,
     location: quickAddLocation,
     qty: 1,
-    min: appSettings.defaultMin || 1,
+    // No || fallback here on purpose — appSettings.defaultMin is always a
+    // real number after the fix above, and 0 || 1 would silently turn an
+    // intentional 0 back into 1.
+    min: appSettings.defaultMin,
     skipGrocery: false,
     unit: '',
     packSize: null,
@@ -3553,7 +3561,8 @@ function addBulkScanItems(){
       store: null,
       location: bulkScanLocation,
       qty: qty,
-      min: appSettings.defaultMin || 1,
+      // No || fallback here either, same reason as above.
+      min: appSettings.defaultMin,
       skipGrocery: false,
       unit: '',
       packSize: null,
