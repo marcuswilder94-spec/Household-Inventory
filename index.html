@@ -3320,6 +3320,7 @@ function commitQuickAddItem(name, category, barcode, photo, nutrition){
     photo: photo || null,
     nutrition: nutrition || null,
     favorite: false,
+    manuallyLow: false,
     price: null
   };
   inventory.push(item);
@@ -3567,6 +3568,7 @@ function addBulkScanItems(){
       photo: b.photo || null,
       nutrition: b.nutrition || null,
       favorite: false,
+      manuallyLow: false,
       price: null
     });
     added++;
@@ -4121,6 +4123,7 @@ function addItem(){
     photo: pendingPhoto,
     nutrition: pendingNutrition,
     favorite: false,
+    manuallyLow: false,
     price: parseFloat(document.getElementById('f-price').value) || null
   };
   inventory.push(item);
@@ -4163,7 +4166,7 @@ function checkReorder(item){
     if(already) grocery = grocery.filter(g=>g.id!==already.id);
     return;
   }
-  if(item.qty <= item.min){
+  if(item.qty <= item.min || item.manuallyLow){
     if(!already){
       grocery.push({
         id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
@@ -4199,6 +4202,22 @@ function changeQty(id, delta){
   const item = inventory.find(i=>i.id===id);
   if(!item) return;
   item.qty = Math.max(0, item.qty + delta);
+  if(delta > 0) item.manuallyLow = false; // restocking clears a manual "running low" flag
+  checkReorder(item);
+  save();
+}
+
+// A manual "running low" flag, independent of qty/min. Built for products
+// where the numeric threshold doesn't work well — e.g. something you only
+// ever keep one of, where "have 1" and "almost empty, still have 1" are
+// numerically identical states. Plugs into the exact same low-stock system
+// as the qty<=min check everywhere it already shows up (Dashboard count,
+// Needs Attention, grocery list, sort order, card styling).
+function toggleManuallyLow(id){
+  const item = inventory.find(i=>i.id===id);
+  if(!item) return;
+  item.manuallyLow = !item.manuallyLow;
+  logActivity(item.manuallyLow ? '⚠️' : '✅', (item.manuallyLow ? 'Marked "' + item.name + '" as running low' : 'Cleared the running-low flag on "' + item.name + '"'));
   checkReorder(item);
   save();
 }
@@ -4414,6 +4433,7 @@ function clearPurchased(){
     let item = inventory.find(i=>i.id===g.itemId);
     if(item){
       item.qty = Math.max(item.qty, item.min + 1, 1);
+      item.manuallyLow = false;
       if(item.price) logSpending(item.name, item.price);
     } else {
       // The original item was deleted from inventory while this was sitting
@@ -4441,6 +4461,7 @@ function clearPurchased(){
         photo: g.photo || null,
         nutrition: null,
         favorite: false,
+        manuallyLow: false,
         price: null
       };
       inventory.push(rebuilt);
@@ -4647,7 +4668,7 @@ function sortItems(items){
   } else if(sortMode === 'qtyLow'){
     arr.sort((a,b) => byFavorite(a,b) || (a.qty - b.qty));
   } else if(sortMode === 'lowStockFirst'){
-    arr.sort((a,b) => byFavorite(a,b) || ((a.qty<=a.min?0:1) - (b.qty<=b.min?0:1)) || (a.qty - b.qty));
+    arr.sort((a,b) => byFavorite(a,b) || (((a.qty<=a.min||a.manuallyLow)?0:1) - ((b.qty<=b.min||b.manuallyLow)?0:1)) || (a.qty - b.qty));
   } else {
     arr.sort(byFavorite);
   }
@@ -4806,7 +4827,7 @@ function renderDashboard(){
     greetingEl.textContent = hour < 12 ? 'Good Morning' : (hour < 18 ? 'Good Afternoon' : 'Good Evening');
   }
 
-  const lowCount = inventory.filter(i=>i.qty <= i.min).length;
+  const lowCount = inventory.filter(i=>i.qty <= i.min || i.manuallyLow).length;
   const expiringCount = inventory
     .filter(i=>i.expiryDate)
     .filter(i=>daysUntil(i.expiryDate) <= appSettings.expirationWarningDays).length;
@@ -4838,7 +4859,7 @@ function renderDashboard(){
   // ---- Needs Attention (low stock + expiring, surfaced together) ----
   const attentionEl = document.getElementById('dashNeedsAttention');
   if(attentionEl){
-    const lowItems = inventory.filter(i=>i.qty <= i.min && !i.skipGrocery);
+    const lowItems = inventory.filter(i=>(i.qty <= i.min || i.manuallyLow) && !i.skipGrocery);
     const expiringItems = inventory.filter(i=>i.expiryDate && daysUntil(i.expiryDate) <= appSettings.expirationWarningDays);
     const combined = [];
     lowItems.forEach(i => combined.push({ item:i, reason: 'Low stock — ' + i.qty + ' left (min ' + i.min + ')', urgent:false }));
@@ -4937,7 +4958,7 @@ function render(){
       : `<span class="dot" style="background:${locColor};"></span>`;
     html += `<div class="loc-group"><div class="loc-title" style="${filterPhoto?'background:rgba(255,255,255,0.85);padding:6px 10px;border-radius:8px;':''}">${locIcon}<span class="loc-name">${escapeHtml(loc)}</span> <span class="badge">${items.length}</span></div>`;
     items.forEach(item=>{
-      const low = item.qty <= item.min;
+      const low = item.qty <= item.min || item.manuallyLow;
       const days = item.expiryDate ? daysUntil(item.expiryDate) : null;
       const expired = days !== null && days < 0;
       const soon = days !== null && days >= 0 && days <= appSettings.expirationWarningDays;
@@ -4979,6 +5000,7 @@ function render(){
             </div>
             <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
             <span class="spacer"></span>
+            <button class="icon-btn" onclick="toggleManuallyLow('${item.id}')" title="${item.manuallyLow ? 'Marked as running low — tap to clear' : 'Mark as running low'}" style="${item.manuallyLow ? 'background:var(--red);color:#fff;' : ''}">${item.manuallyLow ? '🔴' : '⚠️'}</button>
             ${item.nutrition ? `<button class="icon-btn" onclick="showItemNutrition('${item.id}')" title="Nutrition Facts">🥗</button>` : ''}
             <button class="icon-btn" onclick="openEditItem('${item.id}')" title="Edit">✏️</button>
             <button class="icon-btn" onclick="removeItem('${item.id}')" title="Remove">🗑️</button>
