@@ -388,6 +388,9 @@
     color:var(--text);
     font-family:inherit;
   }
+  #f-barcode, #e-barcode{
+    line-height:1.2;
+  }
   textarea{resize:vertical;min-height:44px;}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .photo-input{
@@ -460,6 +463,17 @@
     width:10px;height:10px;
     border-radius:50%;
     flex-shrink:0;
+  }
+  .section-title{
+    font-weight:700;
+    font-size:0.78rem;
+    letter-spacing:0.02em;
+    text-transform:uppercase;
+    color:var(--muted);
+    padding:10px 2px 6px 4px;
+    margin-top:4px;
+    border-left:3px solid var(--border);
+    padding-left:10px;
   }
   .loc-title .loc-name{flex:1;}
   .loc-title .badge{
@@ -915,6 +929,7 @@
 
       <button type="button" class="btn-secondary" style="width:100%;margin-bottom:8px;background:var(--blue);color:#fff;" onclick="openQuickAddLocationModal()">⚡ Quick Add via Scan (just pick a location)</button>
       <button type="button" class="btn-secondary" style="width:100%;margin-bottom:8px;" onclick="openBulkScanLocationModal()">📦 Bulk Scan (Beta) — scan several in a row</button>
+      <button type="button" class="btn-secondary" style="width:100%;margin-bottom:8px;" onclick="openBoughtBeforeModal()">🕐 Add From History</button>
       <button type="button" class="btn-secondary" style="width:100%;margin-bottom:16px;" onclick="openReceiptScanner()">🧾 Scan a Receipt Instead (bulk add)</button>
 
       <label>Item name</label>
@@ -956,6 +971,7 @@
       <input type="text" id="f-category-other" class="hidden" placeholder="Type your own category" style="margin-top:8px;" list="customCategorySuggestions">
       <datalist id="customCategorySuggestions"></datalist>
       <datalist id="customStoreSuggestions"></datalist>
+      <datalist id="sectionSuggestions"></datalist>
 
       <label>Preferred store (optional)</label>
       <select id="f-store" onchange="document.getElementById('f-store-other').classList.toggle('hidden', this.value !== 'Other')">
@@ -979,6 +995,9 @@
         <button type="button" class="photo-btn" style="padding:12px 14px;" onclick="addLocation()">+ New</button>
         <button type="button" class="photo-btn" style="padding:12px 14px;" onclick="openManageLocations()">Manage</button>
       </div>
+
+      <label>Section within that location (optional)</label>
+      <input type="text" id="f-section" placeholder="e.g. Under the sink, Top shelf" list="sectionSuggestions">
 
       <div class="row2">
         <div>
@@ -1189,6 +1208,33 @@
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" onclick="closeMoveToLocationModal()">Cancel</button>
       <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmMoveSelectedItems()">Move</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="boughtBeforeModal">
+  <div class="modal-box" style="max-width:460px;text-align:left;max-height:85vh;overflow-y:auto;">
+    <h3 style="text-align:center;">🕐 Bought Before</h3>
+    <p style="text-align:center;">Items you've removed from inventory before — restore one with all its details instead of starting from scratch.</p>
+    <input type="text" id="boughtBeforeSearch" placeholder="Search…" oninput="renderBoughtBeforeList()" style="margin-bottom:10px;">
+    <div id="boughtBeforeList"></div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeBoughtBeforeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="restoreBoughtBeforeModal">
+  <div class="modal-box" style="max-width:360px;">
+    <h3 style="text-align:center;">↩️ Restore Item</h3>
+    <p id="restoreBoughtBeforeName" style="text-align:center;font-weight:700;font-size:1.05rem;"></p>
+    <label>Location</label>
+    <select id="restore-location-select"></select>
+    <label>Quantity</label>
+    <input type="number" id="restore-qty" value="1" min="1">
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeRestoreBoughtBeforeModal()">Cancel</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmRestoreBoughtBefore()">Add to Inventory</button>
     </div>
   </div>
 </div>
@@ -1565,6 +1611,9 @@
     <label>Storage location</label>
     <select id="e-location"></select>
 
+    <label>Section within that location (optional)</label>
+    <input type="text" id="e-section" placeholder="e.g. Under the sink, Top shelf" list="sectionSuggestions">
+
     <div class="row2">
       <div>
         <label>Quantity on hand</label>
@@ -1793,6 +1842,8 @@ function syncTasksToCloud(){
 // ---- Finance / Spending ----
 const SPENDING_KEY = 'household_spending_v1';
 let spendingLog = JSON.parse(localStorage.getItem(SPENDING_KEY) || 'null') || (SEED_DATA && SEED_DATA.spendingLog) || [];
+const BOUGHT_BEFORE_KEY = 'household_bought_before_v1';
+let boughtBefore = JSON.parse(localStorage.getItem(BOUGHT_BEFORE_KEY) || 'null') || (SEED_DATA && SEED_DATA.boughtBefore) || [];
 
 function logSpending(itemName, amount){
   if(!amount || amount <= 0) return;
@@ -1806,6 +1857,9 @@ function logSpending(itemName, amount){
 }
 function syncSpendingToCloud(){
   if(cloudSyncActive) cloudDoc('spending').set({ entries: cleanForFirestore(spendingLog) }).catch(e=>reportSyncFailure('spending', e));
+}
+function syncBoughtBeforeToCloud(){
+  if(cloudSyncActive) cloudDoc('boughtBefore').set({ entries: cleanForFirestore(boughtBefore) }).catch(e=>reportSyncFailure('bought-before history', e));
 }
 
 function inventoryValue(){
@@ -2314,7 +2368,7 @@ let db = null;
 let auth = null;
 let cloudSyncActive = false;
 let firestoreListenersStarted = false;
-let firstSnapshot = { main: false, settings: false, inventory: false, grocery: false, photoLibrary: false, activity: false, tasks: false, spending: false, mealPlan: false };
+let firstSnapshot = { main: false, settings: false, inventory: false, grocery: false, photoLibrary: false, activity: false, tasks: false, spending: false, mealPlan: false, boughtBefore: false };
 
 function cloudDoc(name){
   return db.collection('households').doc(HOUSEHOLD_ID).collection('data').doc(name);
@@ -2558,6 +2612,16 @@ function initFirestoreSync(){
     }
     firstSnapshot.spending = true;
   }, function(err){ console.warn('spending sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
+
+  cloudDoc('boughtBefore').onSnapshot(function(snap){
+    if(snap.exists){
+      boughtBefore = snap.data().entries || [];
+      localStorage.setItem(BOUGHT_BEFORE_KEY, JSON.stringify(boughtBefore));
+    } else if(!firstSnapshot.boughtBefore){
+      cloudDoc('boughtBefore').set({ entries: cleanForFirestore(boughtBefore) });
+    }
+    firstSnapshot.boughtBefore = true;
+  }, function(err){ console.warn('bought-before sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
 
   cloudDoc('mealPlan').onSnapshot(function(snap){
     if(snap.exists){
@@ -3376,6 +3440,7 @@ function commitQuickAddItem(name, category, barcode, photo, nutrition){
     nutrition: nutrition || null,
     favorite: false,
     manuallyLow: false,
+    section: null,
     price: null
   };
   inventory.push(item);
@@ -3625,6 +3690,7 @@ function addBulkScanItems(){
       nutrition: b.nutrition || null,
       favorite: false,
       manuallyLow: false,
+      section: null,
       price: null
     });
     added++;
@@ -3944,21 +4010,28 @@ const STORE_OPTIONS = ["Walmart","Sam's Club","Costco","Target","Kroger","Publix
 function renderAutocompleteSuggestions(){
   const catList = document.getElementById('customCategorySuggestions');
   const storeList = document.getElementById('customStoreSuggestions');
+  const sectionList = document.getElementById('sectionSuggestions');
   if(!catList || !storeList) return;
 
   const isPreset = (val, presets) => presets.some(p => p.toLowerCase() === (val||'').toLowerCase());
 
   const customCats = new Set();
   const customStores = new Set();
+  const sections = new Set();
   [...inventory, ...grocery].forEach(x=>{
     if(x.category && !isPreset(x.category, CATEGORY_OPTIONS)) customCats.add(x.category);
     if(x.store && !isPreset(x.store, STORE_OPTIONS)) customStores.add(x.store);
   });
+  inventory.forEach(x=>{ if(x.section) sections.add(x.section); });
 
   catList.innerHTML = [...customCats].sort((a,b)=>a.localeCompare(b))
     .map(c=>`<option value="${escapeHtml(c)}"></option>`).join('');
   storeList.innerHTML = [...customStores].sort((a,b)=>a.localeCompare(b))
     .map(s=>`<option value="${escapeHtml(s)}"></option>`).join('');
+  if(sectionList){
+    sectionList.innerHTML = [...sections].sort((a,b)=>a.localeCompare(b))
+      .map(s=>`<option value="${escapeHtml(s)}"></option>`).join('');
+  }
 }
 
 function setStoreField(prefix, value){
@@ -4167,6 +4240,7 @@ function addItem(){
     category: getCategoryFieldValue('f') || 'Uncategorized',
     store: getStoreFieldValue('f') || null,
     location: document.getElementById('f-location').value,
+    section: document.getElementById('f-section').value.trim() || null,
     qty: parseFloat(document.getElementById('f-qty').value) || 0,
     min: parseFloat(document.getElementById('f-min').value) || 0,
     skipGrocery: document.getElementById('f-skip-grocery').checked,
@@ -4194,7 +4268,7 @@ function addItem(){
   }
 
   // reset form
-  ['f-name','f-category','f-unit','f-notes','f-barcode','f-purchase-date','f-frozen-date','f-expiry-date','f-multi-count','f-multi-label'].forEach(id=>document.getElementById(id).value='');
+  ['f-name','f-category','f-unit','f-notes','f-barcode','f-section','f-purchase-date','f-frozen-date','f-expiry-date','f-multi-count','f-multi-label'].forEach(id=>document.getElementById(id).value='');
   document.querySelector('input[name="f-multi-mode"][value="pieces"]').checked = true;
   updateMultiPackHelp('f');
   document.getElementById('f-category-other').classList.add('hidden');
@@ -4287,9 +4361,146 @@ function removeItem(id){
     if(!ok) return;
     const item = inventory.find(i=>i.id===id);
     inventory = inventory.filter(i=>i.id!==id);
-    if(item) logActivity('🗑️', 'Removed "' + item.name + '" from ' + item.location);
+    if(item){
+      logActivity('🗑️', 'Removed "' + item.name + '" from ' + item.location);
+      archiveToBoughtBefore(item);
+    }
     save();
   });
+}
+
+// Keeps a full snapshot of a removed item's details (photo, category, unit,
+// packaging, nutrition, everything) so it can be restored quickly if it's
+// ever bought again — rather than losing everything but the photo (which
+// already persisted separately via the photo library).
+function archiveToBoughtBefore(item){
+  const existing = boughtBefore.find(function(b){
+    return (item.barcode && b.barcode === item.barcode) || (!item.barcode && normalizeName(b.name) === normalizeName(item.name));
+  });
+  const snapshot = {
+    id: existing ? existing.id : (Date.now().toString(36) + Math.random().toString(36).slice(2,6)),
+    name: item.name,
+    category: item.category,
+    store: item.store || null,
+    unit: item.unit || '',
+    packSize: item.packSize || null,
+    packUnit: item.packUnit || null,
+    packsPerBox: item.packsPerBox || null,
+    boxLabel: item.boxLabel || null,
+    notes: item.notes || '',
+    barcode: item.barcode || null,
+    photo: item.photo || null,
+    nutrition: item.nutrition || null,
+    price: item.price || null,
+    skipGrocery: !!item.skipGrocery,
+    section: item.section || null,
+    lastLocation: item.location,
+    removedAt: Date.now()
+  };
+  if(existing){
+    boughtBefore = boughtBefore.map(function(b){ return b.id === existing.id ? snapshot : b; });
+  } else {
+    boughtBefore.unshift(snapshot);
+  }
+  if(boughtBefore.length > 300) boughtBefore = boughtBefore.slice(0, 300);
+  localStorage.setItem(BOUGHT_BEFORE_KEY, JSON.stringify(boughtBefore));
+  syncBoughtBeforeToCloud();
+}
+
+function openBoughtBeforeModal(){
+  document.getElementById('boughtBeforeSearch').value = '';
+  renderBoughtBeforeList();
+  document.getElementById('boughtBeforeModal').classList.remove('hidden');
+}
+function closeBoughtBeforeModal(){
+  document.getElementById('boughtBeforeModal').classList.add('hidden');
+}
+
+function renderBoughtBeforeList(){
+  const q = normalizeName(document.getElementById('boughtBeforeSearch').value || '');
+  const list = document.getElementById('boughtBeforeList');
+  const filtered = boughtBefore.filter(function(b){ return !q || normalizeName(b.name).indexOf(q) !== -1; });
+  if(filtered.length === 0){
+    list.innerHTML = '<p style="text-align:center;color:var(--muted);">' + (boughtBefore.length === 0 ? 'Nothing here yet — items you remove from inventory will show up here.' : 'No matches.') + '</p>';
+    return;
+  }
+  list.innerHTML = filtered.map(function(b){
+    return `<div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;">
+      ${b.photo ? `<img src="${b.photo}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;">` : `<div class="noimg" style="width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">📦</div>`}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;">${escapeHtml(b.name)}</div>
+        <div style="font-size:0.78rem;color:var(--muted);">${escapeHtml(b.category || '')}${b.lastLocation ? (' · last in ' + escapeHtml(b.lastLocation)) : ''}</div>
+      </div>
+      <button class="btn-secondary" onclick="openRestoreBoughtBefore('${b.id}')">↩️ Restore</button>
+    </div>`;
+  }).join('');
+}
+
+let restoreBoughtBeforeId = null;
+function openRestoreBoughtBefore(id){
+  const entry = boughtBefore.find(b=>b.id===id);
+  if(!entry) return;
+  restoreBoughtBeforeId = id;
+  document.getElementById('restoreBoughtBeforeName').textContent = entry.name;
+  const sel = document.getElementById('restore-location-select');
+  sel.innerHTML = LOCATIONS.map(function(l){ return `<option ${l===entry.lastLocation?'selected':''}>${escapeHtml(l)}</option>`; }).join('');
+  document.getElementById('restore-qty').value = 1;
+  document.getElementById('restoreBoughtBeforeModal').classList.remove('hidden');
+}
+function closeRestoreBoughtBeforeModal(){
+  document.getElementById('restoreBoughtBeforeModal').classList.add('hidden');
+  restoreBoughtBeforeId = null;
+}
+
+function confirmRestoreBoughtBefore(){
+  const entry = boughtBefore.find(b=>b.id===restoreBoughtBeforeId);
+  if(!entry) return;
+  const location = document.getElementById('restore-location-select').value;
+  const qty = parseFloat(document.getElementById('restore-qty').value) || 1;
+
+  // If a matching item is already in inventory, bump its quantity instead
+  // of creating a duplicate.
+  const already = inventory.find(function(i){
+    return (entry.barcode && i.barcode === entry.barcode) || (!entry.barcode && normalizeName(i.name) === normalizeName(entry.name));
+  });
+  if(already){
+    already.qty += qty;
+    checkReorder(already);
+    logActivity('↩️', 'Restored "' + entry.name + '" — added to existing quantity (' + already.qty + ' total)');
+  } else {
+    inventory.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      name: entry.name,
+      category: entry.category || 'Uncategorized',
+      store: entry.store || null,
+      location: location,
+      qty: qty,
+      min: appSettings.defaultMin,
+      skipGrocery: entry.skipGrocery || false,
+      unit: entry.unit || '',
+      packSize: entry.packSize || null,
+      packUnit: entry.packUnit || null,
+      packsPerBox: entry.packsPerBox || null,
+      boxLabel: entry.boxLabel || null,
+      notes: entry.notes || '',
+      barcode: entry.barcode || null,
+      purchaseDate: null,
+      frozenDate: null,
+      expiryDate: null,
+      photo: entry.photo || null,
+      nutrition: entry.nutrition || null,
+      favorite: false,
+      manuallyLow: false,
+      price: entry.price || null,
+      section: entry.section || null
+    });
+    logActivity('↩️', 'Restored "' + entry.name + '" to ' + location);
+  }
+  closeRestoreBoughtBeforeModal();
+  closeBoughtBeforeModal();
+  save();
+  switchTab('inventory');
+  showInfo('"' + entry.name + '" added back to inventory.', '✅');
 }
 
 let editItemId = null;
@@ -4308,6 +4519,7 @@ function openEditItem(id){
   setCategoryField('e', item.category || '');
   setStoreField('e', item.store || '');
   populateLocationSelect(item.location, 'e-location');
+  document.getElementById('e-section').value = item.section || '';
   document.getElementById('e-qty').value = item.qty;
   document.getElementById('e-min').value = item.min;
   document.getElementById('e-price').value = item.price || '';
@@ -4359,6 +4571,7 @@ function saveEditItem(){
   item.category = getCategoryFieldValue('e') || 'Uncategorized';
   item.store = getStoreFieldValue('e') || null;
   item.location = document.getElementById('e-location').value;
+  item.section = document.getElementById('e-section').value.trim() || null;
   item.qty = parseFloat(document.getElementById('e-qty').value) || 0;
   item.min = parseFloat(document.getElementById('e-min').value) || 0;
   item.price = parseFloat(document.getElementById('e-price').value) || null;
@@ -4522,6 +4735,7 @@ function clearPurchased(){
         nutrition: null,
         favorite: false,
         manuallyLow: false,
+        section: null,
         price: null
       };
       inventory.push(rebuilt);
@@ -4558,7 +4772,7 @@ function confirmReset(){
 function exportBackup(){
   const data = JSON.stringify({
     inventory, grocery, locations: LOCATIONS, locationPhotos, photoLibrary,
-    settings: appSettings, activityLog, familyMembers, tasks, spendingLog, mealPlan
+    settings: appSettings, activityLog, familyMembers, tasks, spendingLog, mealPlan, boughtBefore
   }, null, 2);
   const filename = 'household_inventory_backup.json';
   const blob = new Blob([data], {type:'application/json'});
@@ -4658,6 +4872,14 @@ function importBackup(e){
         if(spendingLog.length > 300) spendingLog = spendingLog.slice(0, 300);
         localStorage.setItem(SPENDING_KEY, JSON.stringify(spendingLog));
         syncSpendingToCloud();
+      }
+      if(data.boughtBefore){
+        data.boughtBefore.forEach(b=>{
+          if(!boughtBefore.some(x=>x.id===b.id)) boughtBefore.push(b);
+        });
+        if(boughtBefore.length > 300) boughtBefore = boughtBefore.slice(0, 300);
+        localStorage.setItem(BOUGHT_BEFORE_KEY, JSON.stringify(boughtBefore));
+        syncBoughtBeforeToCloud();
       }
       // Settings and meal plan are included in backups for reference but are
       // intentionally NOT auto-applied here — silently overwriting the
@@ -5018,7 +5240,22 @@ function render(){
       ? `<img src="${locPhoto}" style="width:20px;height:20px;border-radius:6px;object-fit:cover;flex-shrink:0;">`
       : `<span class="dot" style="background:${locColor};"></span>`;
     html += `<div class="loc-group"><div class="loc-title" style="${filterPhoto?'background:rgba(255,255,255,0.85);padding:6px 10px;border-radius:8px;':''}">${locIcon}<span class="loc-name">${escapeHtml(loc)}</span> <span class="badge">${items.length}</span></div>`;
-    items.forEach(item=>{
+    // Group items within this location by section: unsectioned items
+    // first (no sub-header), then named sections alphabetically, each
+    // getting its own sub-header. Order within each group is whatever
+    // sortItems() already produced.
+    const noSection = items.filter(i => !i.section);
+    const sectionNames = [...new Set(items.filter(i => i.section).map(i => i.section))].sort((a,b)=>a.localeCompare(b));
+    const orderedItems = noSection.slice();
+    sectionNames.forEach(sec => { orderedItems.push(...items.filter(i => i.section === sec)); });
+    let lastSection = undefined;
+    orderedItems.forEach(item=>{
+      if(item.section !== lastSection){
+        lastSection = item.section || '';
+        if(lastSection){
+          html += `<div class="section-title">${escapeHtml(lastSection)}</div>`;
+        }
+      }
       const low = item.qty <= item.min || item.manuallyLow;
       const days = item.expiryDate ? daysUntil(item.expiryDate) : null;
       const expired = days !== null && days < 0;
@@ -5045,8 +5282,8 @@ function render(){
             <div class="inv-card-body">
               <div class="inv-card-name">${escapeHtml(item.name)}${low?'<span class="low-tag">LOW</span>':''}${(low && item.skipGrocery)?'<span class="low-tag" style="background:#eef0f3;color:var(--muted);">NOT ON LIST</span>':''}${expired?'<span class="low-tag" style="background:#fdeeec;color:var(--red);">EXPIRED</span>':(soon?'<span class="low-tag" style="background:#fff4e0;color:var(--amber);">SOON</span>':'')}</div>
               <div class="inv-card-meta ${low?'low':''}">${escapeHtml(item.category)} · min ${item.min}${item.unit?(' '+escapeHtml(item.unit)):''}</div>
-              ${(item.packSize && item.packUnit) ? `<div class="item-notes" style="font-style:normal;">📦 ${item.packSize} ${escapeHtml(item.packUnit)} per ${item.unit ? escapeHtml(item.unit.replace(/s$/,'')) : 'package'} · <strong>${item.qty * item.packSize} ${escapeHtml(item.packUnit)}</strong> on hand total</div>` : ''}
-              ${(item.packsPerBox) ? `<div class="item-notes" style="font-style:normal;">📦 ${item.packsPerBox} ${escapeHtml(item.unit || 'packs')} per ${escapeHtml(item.boxLabel || 'box')}</div>` : ''}
+              ${(item.packSize && item.packUnit) ? `<div class="item-notes" style="font-style:normal;display:flex;align-items:center;gap:5px;">${item.photo ? `<img src="${item.photo}" style="width:16px;height:16px;border-radius:3px;object-fit:cover;flex-shrink:0;">` : '📦'} ${item.packSize} ${escapeHtml(item.packUnit)} per ${item.unit ? escapeHtml(item.unit.replace(/s$/,'')) : 'package'} · <strong>${item.qty * item.packSize} ${escapeHtml(item.packUnit)}</strong> on hand total</div>` : ''}
+              ${(item.packsPerBox) ? `<div class="item-notes" style="font-style:normal;display:flex;align-items:center;gap:5px;">${item.photo ? `<img src="${item.photo}" style="width:16px;height:16px;border-radius:3px;object-fit:cover;flex-shrink:0;">` : '📦'} ${item.packsPerBox} ${escapeHtml(item.unit || 'packs')} per ${escapeHtml(item.boxLabel || 'box')}</div>` : ''}
               ${dateBits.length ? `<div class="inv-card-dates">${dateBits.join(' · ')}</div>` : ''}
               ${item.notes ? `<div class="item-notes">${escapeHtml(item.notes)}</div>` : ''}
             </div>
