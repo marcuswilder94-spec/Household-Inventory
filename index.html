@@ -822,6 +822,7 @@
   <button type="button" class="btn-secondary" style="margin-top:10px;" onclick="doSignOut()">Sign Out</button>
   <button type="button" class="btn-secondary" style="margin-top:10px;margin-left:8px;" onclick="openSettings()">⚙️ Settings</button>
   <button type="button" class="btn-secondary" id="viewModeToggleBtn" style="margin-top:10px;margin-left:8px;" onclick="toggleViewOnlyMode()">🔒 View Only</button>
+  <button type="button" class="btn-secondary hide-in-view-mode" style="margin-top:10px;margin-left:8px;" onclick="startVoiceListenOnce()">🎤 Voice</button>
 </header>
 
 <div class="select-action-bar hidden" id="selectActionBar">
@@ -1066,6 +1067,7 @@
           <img id="f-photo-preview" class="photo-preview hidden">
         </div>
         <button type="button" id="f-photo-remove-btn" class="btn-secondary hidden" style="width:100%;margin-top:6px;font-size:0.82rem;" onclick="removeAddPhoto()">✕ Remove this photo</button>
+        <button type="button" id="f-photo-bg-btn" class="btn-secondary hidden" style="width:100%;margin-top:6px;font-size:0.82rem;" onclick="runBgRemovalOnAddPhoto()">✨ Remove Background</button>
         <div id="f-photo-choice" class="hidden" style="margin:10px 0;display:flex;flex-direction:column;gap:8px;">
           <div class="item-notes" style="margin-bottom:2px;">✓ Found a saved photo for this item — what would you like to do?</div>
           <label style="display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;">
@@ -1137,6 +1139,9 @@
         <button class="btn-secondary" style="flex:1;" onclick="startPhotoCatchup()">📸 Photo Catch-Up</button>
       </div>
       <div class="btn-row hide-in-view-mode">
+        <button class="btn-secondary" style="flex:1;" onclick="startCleanUpAllPhotos()">✨ Clean Up All Photos (white bg)</button>
+      </div>
+      <div class="btn-row hide-in-view-mode">
         <button class="btn-danger" onclick="resetInventory()">Reset Inventory</button>
       </div>
     </div>
@@ -1148,6 +1153,7 @@
       <h2>🛒 Grocery List</h2>
       <p class="sub">Items land here automatically when they hit their minimum. Check them off as you buy them to restock inventory.</p>
       <button class="primary hide-in-view-mode" style="margin:0 0 14px;" onclick="openShoppingMode()">🛒 Start Shopping Mode</button>
+      <button class="btn-secondary hide-in-view-mode" style="width:100%;margin:0 0 14px;" onclick="openOnOrderModal()">📦 On Order</button>
       <div id="groceryList"></div>
       <div class="btn-row hide-in-view-mode">
         <button class="btn-secondary" onclick="clearPurchased()">Restock Checked Items</button>
@@ -1259,6 +1265,37 @@
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" onclick="closeSetCategoryModal()">Cancel</button>
       <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmSetCategorySelectedItems()">Set Category</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="onOrderModal">
+  <div class="modal-box" style="max-width:460px;text-align:left;max-height:85vh;overflow-y:auto;">
+    <h3 style="text-align:center;">📦 On Order</h3>
+    <p style="text-align:center;">Items you've ordered online but haven't received yet. Check off what's arrived and mark it received to add it straight to inventory.</p>
+    <button type="button" class="btn-secondary" style="width:100%;margin-bottom:10px;" onclick="openAddOnOrderItemModal()">+ Add Ordered Item</button>
+    <div id="onOrderList"></div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeOnOrderModal()">Close</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--green);" onclick="receiveSelectedOnOrderItems()">✅ Mark Selected Received</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="addOnOrderItemModal">
+  <div class="modal-box" style="max-width:360px;">
+    <h3 style="text-align:center;">📦 Add Ordered Item</h3>
+    <label>Item name</label>
+    <input type="text" id="oo-name" placeholder="e.g. Paper Towels (24-pack)">
+    <label>Quantity</label>
+    <input type="number" id="oo-qty" value="1" min="1">
+    <label>Destination location</label>
+    <select id="oo-location"></select>
+    <label>Store / order note (optional)</label>
+    <input type="text" id="oo-note" placeholder="e.g. Amazon, arriving Friday">
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeAddOnOrderItemModal()">Cancel</button>
+      <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="confirmAddOnOrderItem()">Add</button>
     </div>
   </div>
 </div>
@@ -1541,6 +1578,11 @@
     <label style="margin-top:12px;">Default minimum quantity for new items</label>
     <input type="number" id="set-default-min" min="0" placeholder="1">
 
+    <label style="display:flex;align-items:center;gap:10px;margin-top:16px;cursor:pointer;">
+      <input type="checkbox" id="set-wake-word" style="width:auto;" onchange="toggleWakeWordMode(this.checked)"> "Hey Manifest" always-listening voice commands
+    </label>
+    <div class="item-notes" style="margin-top:2px;">Only works while this tab is open and on screen — not while your phone is locked or the app is in the background. Uses more battery while on, and your voice is sent off-device to be transcribed. The 🎤 button in the header always works too, without needing this turned on.</div>
+
     <div class="modal-btns" style="margin-top:18px;">
       <button class="modal-btn-no" style="flex:1;" onclick="closeSettings()">Close</button>
       <button class="modal-btn-yes" style="flex:1;background:var(--blue);" onclick="saveSettingsFromModal()">Save</button>
@@ -1569,6 +1611,27 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="cleanUpPhotosModal">
+  <div class="modal-box" style="max-width:380px;">
+    <h3 style="text-align:center;">✨ Clean Up All Photos</h3>
+    <p id="cleanUpPhotosStatus" style="text-align:center;">Preparing…</p>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" id="cleanUpPhotosCloseBtn" onclick="closeCleanUpPhotosModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="voiceModal">
+  <div class="modal-box" style="max-width:360px;">
+    <h3 style="text-align:center;">🎤 Voice Command</h3>
+    <p id="voiceStatusText" style="text-align:center;font-size:1rem;font-weight:600;">Listening…</p>
+    <p id="voiceHeardText" style="text-align:center;font-size:0.85rem;color:var(--muted);"></p>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="modal-btn-no" style="flex:1;" onclick="closeVoiceModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="photoCatchupModal">
   <div class="modal-box" style="max-width:380px;">
     <h3 style="text-align:center;">📸 Photo Catch-Up</h3>
@@ -1581,8 +1644,10 @@
       </div>
       <label class="photo-btn" id="catchupPhotoLabel" style="display:block;text-align:center;margin-top:8px;">📷 Take/Choose Photo</label>
       <input type="file" accept="image/*" id="catchupPhotoInput" class="hidden">
+      <button type="button" id="catchupBgBtn" class="btn-secondary hidden" style="width:100%;margin-top:6px;font-size:0.82rem;" onclick="runBgRemovalOnCatchupPhoto()">✨ Remove Background</button>
       <div class="photo-dropzone-hint">or drag a photo here</div>
     </div>
+    <button type="button" id="catchupSaveBtn" class="primary hidden" style="width:100%;margin-top:10px;" onclick="saveCatchupPhotoAndNext()">✅ Save & Next Item</button>
     <div class="modal-btns" style="margin-top:16px;">
       <button class="modal-btn-no" style="flex:1;" onclick="skipPhotoCatchup()">Skip</button>
       <button class="modal-btn-no" style="flex:1;" onclick="closePhotoCatchup()">Close for now</button>
@@ -1741,6 +1806,7 @@
       </div>
       <label class="photo-btn hidden" id="e-photo-label">📷 Add Photo</label>
       <input type="file" accept="image/*" id="e-photo" class="hidden">
+      <button type="button" id="e-photo-bg-btn" class="btn-secondary hidden" style="width:100%;margin-top:6px;font-size:0.82rem;" onclick="runBgRemovalOnEditPhoto()">✨ Remove Background</button>
       <div class="photo-dropzone-hint">or drag a photo here</div>
     </div>
 
@@ -1897,6 +1963,8 @@ const SPENDING_KEY = 'household_spending_v1';
 let spendingLog = JSON.parse(localStorage.getItem(SPENDING_KEY) || 'null') || (SEED_DATA && SEED_DATA.spendingLog) || [];
 const BOUGHT_BEFORE_KEY = 'household_bought_before_v1';
 let boughtBefore = JSON.parse(localStorage.getItem(BOUGHT_BEFORE_KEY) || 'null') || (SEED_DATA && SEED_DATA.boughtBefore) || [];
+const ON_ORDER_KEY = 'household_on_order_v1';
+let onOrder = JSON.parse(localStorage.getItem(ON_ORDER_KEY) || 'null') || (SEED_DATA && SEED_DATA.onOrder) || [];
 
 function logSpending(itemName, amount){
   if(!amount || amount <= 0) return;
@@ -1913,6 +1981,9 @@ function syncSpendingToCloud(){
 }
 function syncBoughtBeforeToCloud(){
   if(cloudSyncActive) cloudDoc('boughtBefore').set({ entries: cleanForFirestore(boughtBefore) }).catch(e=>reportSyncFailure('bought-before history', e));
+}
+function syncOnOrderToCloud(){
+  if(cloudSyncActive) cloudDoc('onOrder').set({ entries: cleanForFirestore(onOrder) }).catch(e=>reportSyncFailure('on-order list', e));
 }
 
 function inventoryValue(){
@@ -2126,6 +2197,7 @@ function openSettings(){
   document.getElementById('set-exp-days').value = appSettings.expirationWarningDays;
   document.getElementById('set-default-store').value = appSettings.defaultStore || '';
   document.getElementById('set-default-min').value = appSettings.defaultMin;
+  document.getElementById('set-wake-word').checked = wakeWordActive;
   document.getElementById('settingsModal').classList.remove('hidden');
 }
 function closeSettings(){
@@ -2291,6 +2363,365 @@ function closeFillPhotosModal(){
   document.getElementById('fillPhotosModal').classList.add('hidden');
 }
 
+// ---- Clean Up All Photos (bulk background removal) ----
+// Runs every existing item photo through the same on-device AI background
+// removal used elsewhere, replacing each with a white-background version.
+// Sequential, not concurrent — each photo takes a few real seconds of
+// on-device processing, and running them one at a time keeps the tab
+// responsive and gives an accurate progress readout instead of freezing
+// the page under a pile of simultaneous AI inference calls.
+let cleanUpPhotosCancelled = false;
+
+function startCleanUpAllPhotos(){
+  const candidates = inventory.filter(i => i.photo);
+  if(candidates.length === 0){
+    showInfo('No items have a photo yet — add some first, then come back to clean them up.', 'ℹ️');
+    return;
+  }
+  openConfirmModal(`Process ${candidates.length} existing photo${candidates.length===1?'':'s'} with AI background removal? The first photo will download a ~40MB AI model, then each photo takes a few seconds. You can cancel at any time — anything already done stays done.`, function(ok){
+    if(ok) runCleanUpAllPhotos(candidates);
+  });
+}
+
+function runCleanUpAllPhotos(candidates){
+  cleanUpPhotosCancelled = false;
+  const statusEl = document.getElementById('cleanUpPhotosStatus');
+  const closeBtn = document.getElementById('cleanUpPhotosCloseBtn');
+  closeBtn.textContent = 'Cancel';
+  document.getElementById('cleanUpPhotosModal').classList.remove('hidden');
+
+  let done = 0;
+  let failed = 0;
+  let i = 0;
+
+  function processNext(){
+    if(cleanUpPhotosCancelled || i >= candidates.length){
+      closeBtn.textContent = 'Done';
+      statusEl.textContent = cleanUpPhotosCancelled
+        ? `Stopped early — cleaned up ${done} of ${candidates.length}. What was done has been saved.`
+        : `Finished — cleaned up ${done} of ${candidates.length} photo${candidates.length===1?'':'s'}.` + (failed ? ` ${failed} couldn't be processed and were left as-is.` : '');
+      save();
+      return;
+    }
+    const item = candidates[i];
+    i++;
+    statusEl.textContent = `Processing ${i} of ${candidates.length}: ${item.name}… (first photo downloads the AI model, can take a while)`;
+    removeBackgroundFromPhoto(item.photo, function(result, err){
+      if(result){
+        item.photo = result;
+        savePhotoToLibrary(item.name, result);
+        done++;
+      } else {
+        failed++;
+      }
+      if(done > 0 && done % 5 === 0) save();
+      processNext();
+    });
+  }
+  processNext();
+}
+
+function closeCleanUpPhotosModal(){
+  cleanUpPhotosCancelled = true;
+  document.getElementById('cleanUpPhotosModal').classList.add('hidden');
+}
+
+// ---- Voice Commands ----
+// Two entry points share the same parsing/matching/execution pipeline:
+// the 🎤 header button (one-shot, always available) and an optional
+// "Hey Manifest" continuous wake-word mode (off by default, toggled in
+// Settings). Deliberately kept to a constrained set of recognized phrasings
+// rather than open-ended interpretation — guessing wrong on a deletion or
+// quantity change is worse than just not understanding the command.
+
+let wakeWordRecognition = null;
+let wakeWordActive = false;
+
+function openVoiceModal(){
+  document.getElementById('voiceHeardText').textContent = '';
+  document.getElementById('voiceModal').classList.remove('hidden');
+}
+function closeVoiceModal(){
+  document.getElementById('voiceModal').classList.add('hidden');
+}
+function setVoiceStatus(status, heard){
+  document.getElementById('voiceStatusText').textContent = status;
+  document.getElementById('voiceHeardText').textContent = heard || '';
+}
+
+// Speaks the result back, in addition to showing it — a purely optional
+// nicety for hands-free use. Fails silently on browsers without speech
+// synthesis rather than blocking anything.
+function voiceRespond(message){
+  try{
+    if(window.speechSynthesis){
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(message);
+      window.speechSynthesis.speak(utter);
+    }
+  }catch(e){}
+}
+
+// Finds inventory items matching a spoken name. Exact match first, then a
+// loose substring match in either direction (spoken names rarely match
+// stored names exactly — "the dish soap" vs "Dawn Ultra Dish Soap").
+// Deliberately returns ALL matches rather than guessing at one when
+// several fit, so the caller can ask for clarification instead of acting
+// on the wrong item.
+function findInventoryMatches(spokenName){
+  const norm = normalizeName(spokenName);
+  if(!norm) return [];
+  const exact = inventory.filter(i => normalizeName(i.name) === norm);
+  if(exact.length) return exact;
+  return inventory.filter(i => {
+    const n = normalizeName(i.name);
+    return n.indexOf(norm) !== -1 || norm.indexOf(n) !== -1;
+  });
+}
+
+function parseVoiceCommand(rawText){
+  let text = (rawText || '').toLowerCase().trim();
+  if(!text) return null;
+  text = text.replace(/^hey manifest[,]?\s*/i, '').trim();
+  if(!text) return null;
+
+  let m;
+
+  // Remove / throw away — covers "I just threw this item away" style phrasing
+  m = text.match(/^(?:please\s+)?(?:remove|delete|throw away|throwing away|threw away|toss(?:ed)?|got rid of)\s+(?:the\s+|my\s+|this\s+)?(.+)$/i);
+  if(m && m[1] && m[1].trim() !== 'item') return { action:'remove', name: m[1].trim() };
+  m = text.match(/^i(?:'m| am)?\s*(?:just\s+)?(?:threw away|throwing away|got rid of)\s+(?:the\s+|my\s+|this\s+)?(.+)$/i);
+  if(m && m[1]) return { action:'remove', name: m[1].trim() };
+  // "I just threw this item away, dish soap" — name trails after a pause
+  // instead of directly following the verb.
+  m = text.match(/^(?:i\s*(?:'m| am)?\s*(?:just\s+)?)?(?:threw|throw|throwing)\s+(?:this|it|that)\s+(?:item\s+)?away[,]?\s+(?:it'?s\s+)?(?:the\s+|my\s+)?(.+)$/i);
+  if(m && m[1]) return { action:'remove', name: m[1].trim() };
+
+  // Out of stock
+  m = text.match(/^(?:we'?re\s+|we are\s+|i'?m\s+|i am\s+)?out of\s+(?:the\s+|my\s+)?(.+)$/i);
+  if(m && m[1]) return { action:'out', name: m[1].trim() };
+  m = text.match(/^(.+?)\s+(?:is|are)\s+(?:out|empty|gone|finished)$/i);
+  if(m && m[1]) return { action:'out', name: m[1].trim() };
+
+  // Running low
+  m = text.match(/^mark\s+(?:the\s+|my\s+)?(.+?)\s+(?:as\s+)?low$/i);
+  if(m && m[1]) return { action:'low', name: m[1].trim() };
+  m = text.match(/^(.+?)\s+(?:is|are)\s+(?:almost empty|running low|getting low|low)$/i);
+  if(m && m[1]) return { action:'low', name: m[1].trim() };
+
+  // Add / restock
+  m = text.match(/^add\s+(\d+)?\s*(.+)$/i);
+  if(m && m[2]) return { action:'add', qty: m[1] ? parseInt(m[1],10) : 1, name: m[2].trim() };
+
+  return null;
+}
+
+function handleVoiceTranscript(transcript){
+  const parsed = parseVoiceCommand(transcript);
+  if(!parsed){
+    setVoiceStatus('Didn\'t understand that command.', '"' + transcript + '"');
+    voiceRespond('Sorry, I didn\'t understand that.');
+    return;
+  }
+  setVoiceStatus('Got it — working on it…', '"' + transcript + '"');
+  if(parsed.action === 'remove') voiceRemoveItem(parsed.name);
+  else if(parsed.action === 'low') voiceMarkLow(parsed.name);
+  else if(parsed.action === 'out') voiceMarkOut(parsed.name);
+  else if(parsed.action === 'add') voiceAddOrBump(parsed.name, parsed.qty);
+}
+
+function voiceRemoveItem(name){
+  const matches = findInventoryMatches(name);
+  if(matches.length === 0){
+    setVoiceStatus('Couldn\'t find that item.', `No match for "${name}"`);
+    voiceRespond(`I couldn't find ${name} in your inventory.`);
+    return;
+  }
+  if(matches.length > 1){
+    setVoiceStatus('Found more than one match.', `${matches.length} items match "${name}" — please remove it manually to be safe.`);
+    voiceRespond(`I found ${matches.length} items matching ${name}. Please remove it manually to be safe.`);
+    return;
+  }
+  const item = matches[0];
+  closeVoiceModal();
+  openConfirmModal(`Voice command: remove "${item.name}" from inventory?`, function(ok){
+    if(!ok) return;
+    inventory = inventory.filter(i => i.id !== item.id);
+    logActivity('🗑️', 'Removed "' + item.name + '" from ' + item.location + ' (voice command)');
+    archiveToBoughtBefore(item);
+    save();
+    voiceRespond(`Removed ${item.name}.`);
+  });
+}
+
+function voiceMarkLow(name){
+  const matches = findInventoryMatches(name);
+  if(matches.length === 0){
+    setVoiceStatus('Couldn\'t find that item.', `No match for "${name}"`);
+    voiceRespond(`I couldn't find ${name} in your inventory.`);
+    return;
+  }
+  if(matches.length > 1){
+    setVoiceStatus('Found more than one match.', `${matches.length} items match "${name}" — please flag it manually.`);
+    voiceRespond(`I found ${matches.length} items matching ${name}. Please flag it manually.`);
+    return;
+  }
+  const item = matches[0];
+  item.manuallyLow = true;
+  logActivity('⚠️', 'Marked "' + item.name + '" as running low (voice command)');
+  checkReorder(item);
+  save();
+  setVoiceStatus('Done.', `Marked "${item.name}" as running low.`);
+  voiceRespond(`Marked ${item.name} as running low.`);
+}
+
+function voiceMarkOut(name){
+  const matches = findInventoryMatches(name);
+  if(matches.length === 0){
+    setVoiceStatus('Couldn\'t find that item.', `No match for "${name}"`);
+    voiceRespond(`I couldn't find ${name} in your inventory.`);
+    return;
+  }
+  if(matches.length > 1){
+    setVoiceStatus('Found more than one match.', `${matches.length} items match "${name}" — please update it manually.`);
+    voiceRespond(`I found ${matches.length} items matching ${name}. Please update it manually.`);
+    return;
+  }
+  const item = matches[0];
+  item.qty = 0;
+  logActivity('⚫', 'Marked "' + item.name + '" as out of stock (voice command)');
+  checkReorder(item);
+  save();
+  setVoiceStatus('Done.', `Marked "${item.name}" as out of stock.`);
+  voiceRespond(`Marked ${item.name} as out of stock.`);
+}
+
+function voiceAddOrBump(name, qty){
+  const matches = findInventoryMatches(name);
+  if(matches.length === 1){
+    const item = matches[0];
+    changeQty(item.id, qty || 1);
+    setVoiceStatus('Done.', `Added ${qty||1} to "${item.name}" — now at ${item.qty}.`);
+    voiceRespond(`Added ${qty||1} to ${item.name}. Now at ${item.qty}.`);
+    return;
+  }
+  if(matches.length > 1){
+    setVoiceStatus('Found more than one match.', `${matches.length} items match "${name}" — please update it manually.`);
+    voiceRespond(`I found ${matches.length} items matching ${name}. Please update it manually.`);
+    return;
+  }
+  setVoiceStatus('New item — opening the Add form.', `Didn't find "${name}" yet.`);
+  voiceRespond(`I didn't find ${name} yet. Opening the Add form so you can finish adding it.`);
+  closeVoiceModal();
+  switchTab('add');
+  setTimeout(function(){
+    const nameField = document.getElementById('f-name');
+    if(nameField) nameField.value = name;
+  }, 150);
+}
+
+function getSpeechRecognitionCtor(){
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function startVoiceListenOnce(){
+  const Ctor = getSpeechRecognitionCtor();
+  if(!Ctor){
+    showInfo('Voice commands aren\'t supported in this browser — try Chrome or Safari on a recent device.', 'ℹ️');
+    return;
+  }
+  openVoiceModal();
+  setVoiceStatus('🎤 Listening…', '');
+  let recognition;
+  try{
+    recognition = new Ctor();
+  }catch(e){
+    setVoiceStatus('Could not start the microphone on this device.', '');
+    return;
+  }
+  recognition.lang = 'en-US';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.onresult = function(e){
+    const transcript = e.results[0][0].transcript;
+    handleVoiceTranscript(transcript);
+  };
+  recognition.onerror = function(e){
+    if(e.error === 'not-allowed' || e.error === 'service-not-allowed'){
+      setVoiceStatus('Microphone access was blocked.', 'Check your browser\'s site permissions.');
+    } else if(e.error === 'no-speech'){
+      setVoiceStatus('Didn\'t hear anything — try again.', '');
+    } else {
+      setVoiceStatus('Could not understand that — try again.', '');
+    }
+  };
+  try{ recognition.start(); }catch(e){ setVoiceStatus('Could not start listening.', ''); }
+}
+
+function toggleWakeWordMode(enabled){
+  wakeWordActive = !!enabled;
+  if(wakeWordActive) startWakeWordListening();
+  else stopWakeWordListening();
+}
+
+function startWakeWordListening(){
+  const Ctor = getSpeechRecognitionCtor();
+  if(!Ctor){
+    showInfo('Voice commands aren\'t supported in this browser.', 'ℹ️');
+    wakeWordActive = false;
+    const cb = document.getElementById('set-wake-word');
+    if(cb) cb.checked = false;
+    return;
+  }
+  try{
+    wakeWordRecognition = new Ctor();
+  }catch(e){
+    wakeWordActive = false;
+    return;
+  }
+  wakeWordRecognition.lang = 'en-US';
+  wakeWordRecognition.continuous = true;
+  wakeWordRecognition.interimResults = false;
+  wakeWordRecognition.onresult = function(e){
+    const last = e.results[e.results.length - 1];
+    const transcript = (last[0].transcript || '').toLowerCase();
+    if(transcript.indexOf('hey manifest') === -1) return;
+    const afterWake = transcript.split('hey manifest')[1];
+    openVoiceModal();
+    if(afterWake && afterWake.trim()){
+      handleVoiceTranscript(afterWake.trim());
+    } else {
+      setVoiceStatus('🎤 Yes? Listening for your command…', '');
+    }
+  };
+  wakeWordRecognition.onerror = function(e){
+    if(e.error === 'not-allowed' || e.error === 'service-not-allowed'){
+      wakeWordActive = false;
+      const cb = document.getElementById('set-wake-word');
+      if(cb) cb.checked = false;
+      showInfo('Microphone access was blocked — "Hey Manifest" needs mic permission to work.', 'ℹ️');
+    }
+    // Other errors (e.g. no-speech, network) are expected during long
+    // periods of silence — the onend handler below restarts listening.
+  };
+  wakeWordRecognition.onend = function(){
+    // Browsers periodically stop continuous recognition sessions on their
+    // own — restart automatically as long as the toggle is still on.
+    if(wakeWordActive){
+      try{ wakeWordRecognition.start(); }catch(e){}
+    }
+  };
+  try{ wakeWordRecognition.start(); }catch(e){}
+}
+
+function stopWakeWordListening(){
+  wakeWordActive = false;
+  if(wakeWordRecognition){
+    try{ wakeWordRecognition.onend = null; wakeWordRecognition.stop(); }catch(e){}
+    wakeWordRecognition = null;
+  }
+}
+
 function saveLocationPhotos(){
   localStorage.setItem(LOCATION_PHOTOS_KEY, JSON.stringify(locationPhotos));
   syncMainToCloud();
@@ -2421,7 +2852,7 @@ let db = null;
 let auth = null;
 let cloudSyncActive = false;
 let firestoreListenersStarted = false;
-let firstSnapshot = { main: false, settings: false, inventory: false, grocery: false, photoLibrary: false, activity: false, tasks: false, spending: false, mealPlan: false, boughtBefore: false };
+let firstSnapshot = { main: false, settings: false, inventory: false, grocery: false, photoLibrary: false, activity: false, tasks: false, spending: false, mealPlan: false, boughtBefore: false, onOrder: false };
 
 function cloudDoc(name){
   return db.collection('households').doc(HOUSEHOLD_ID).collection('data').doc(name);
@@ -2675,6 +3106,16 @@ function initFirestoreSync(){
     }
     firstSnapshot.boughtBefore = true;
   }, function(err){ console.warn('bought-before sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
+
+  cloudDoc('onOrder').onSnapshot(function(snap){
+    if(snap.exists){
+      onOrder = snap.data().entries || [];
+      localStorage.setItem(ON_ORDER_KEY, JSON.stringify(onOrder));
+    } else if(!firstSnapshot.onOrder){
+      cloudDoc('onOrder').set({ entries: cleanForFirestore(onOrder) });
+    }
+    firstSnapshot.onOrder = true;
+  }, function(err){ console.warn('on-order sync error', err); if(err && err.code==='permission-denied') handleAccessDenied(); });
 
   cloudDoc('mealPlan').onSnapshot(function(snap){
     if(snap.exists){
@@ -2996,6 +3437,7 @@ function handleAddPhotoChoice(value){
     photoIsAuto = false;
     document.getElementById('f-photo-preview').classList.add('hidden');
     document.getElementById('f-photo-remove-btn').classList.add('hidden');
+    document.getElementById('f-photo-bg-btn').classList.add('hidden');
     document.getElementById('f-photo-label').classList.add('hidden');
   }
 }
@@ -3028,6 +3470,7 @@ document.getElementById('f-name').addEventListener('input', function(e){
       photoIsAuto = false;
       document.getElementById('f-photo-preview').classList.add('hidden');
       document.getElementById('f-photo-remove-btn').classList.add('hidden');
+      document.getElementById('f-photo-bg-btn').classList.add('hidden');
     }
     autoPhotoDismissedFor = null;
     showAddPhotoChoice(false);
@@ -3039,15 +3482,72 @@ function resizeImage(src, callback){
   img.crossOrigin = 'anonymous';
   img.onload = function(){
     const canvas = document.createElement('canvas');
-    const maxW = 300;
+    const maxW = 220;
     const scale = Math.min(1, maxW / img.width);
     canvas.width = img.width * scale;
     canvas.height = img.height * scale;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    callback(canvas.toDataURL('image/jpeg', 0.6));
+    callback(canvas.toDataURL('image/jpeg', 0.45));
   };
   img.src = src;
+}
+
+// ---- AI Background Removal (fully client-side) ----
+// Uses @imgly/background-removal — runs an ONNX segmentation model
+// entirely in the browser via WebAssembly. No API key, no server, no
+// per-image cost, and the photo never leaves the device. The tradeoff:
+// the AI model itself (~40MB) has to download once on first use, and each
+// photo takes a few real seconds to process since the device is doing the
+// AI work locally rather than a fast remote server.
+let imglyRemoveBackgroundFn = null;
+function loadBgRemovalLib(callback){
+  if(imglyRemoveBackgroundFn){ callback(); return; }
+  import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm').then(function(module){
+    imglyRemoveBackgroundFn = module.removeBackground || module.default;
+    callback();
+  }).catch(function(err){
+    console.warn('Failed to load background removal library', err);
+    callback(err);
+  });
+}
+
+// Takes any photo src (data URL or http URL), removes the background, and
+// composites the result onto a plain white background — then runs it
+// through the exact same resize/compress pipeline as every other photo in
+// the app, so this never reintroduces the Firestore document-size problem.
+// callback(finalDataUrl, error) — finalDataUrl is null if it failed.
+function removeBackgroundFromPhoto(src, callback){
+  loadBgRemovalLib(function(loadErr){
+    if(loadErr || !imglyRemoveBackgroundFn){
+      callback(null, loadErr || new Error('Background removal library did not load'));
+      return;
+    }
+    imglyRemoveBackgroundFn(src).then(function(blob){
+      const objectUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = function(){
+        const canvas = document.createElement('canvas');
+        const maxW = 220;
+        const scale = Math.min(1, maxW / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(objectUrl);
+        callback(canvas.toDataURL('image/jpeg', 0.45), null);
+      };
+      img.onerror = function(){
+        URL.revokeObjectURL(objectUrl);
+        callback(null, new Error('Could not render the processed image'));
+      };
+      img.src = objectUrl;
+    }).catch(function(err){
+      callback(null, err);
+    });
+  });
 }
 
 function setPhotoFromSrc(src, isAuto){
@@ -3058,6 +3558,24 @@ function setPhotoFromSrc(src, isAuto){
     preview.src = pendingPhoto;
     preview.classList.remove('hidden');
     document.getElementById('f-photo-remove-btn').classList.remove('hidden');
+    document.getElementById('f-photo-bg-btn').classList.remove('hidden');
+  });
+}
+
+function runBgRemovalOnAddPhoto(){
+  if(!pendingPhoto) return;
+  const btn = document.getElementById('f-photo-bg-btn');
+  btn.disabled = true;
+  btn.textContent = '✨ Processing… (can take a few seconds)';
+  removeBackgroundFromPhoto(pendingPhoto, function(result, err){
+    btn.disabled = false;
+    btn.textContent = '✨ Remove Background';
+    if(err || !result){
+      showInfo('Could not process that photo — check your internet connection (the AI model needs to download the first time) and try again.', 'ℹ️');
+      return;
+    }
+    pendingPhoto = result;
+    document.getElementById('f-photo-preview').src = result;
   });
 }
 
@@ -3067,12 +3585,18 @@ function removeAddPhoto(){
   autoPhotoDismissedFor = normalizeName(document.getElementById('f-name').value || '');
   document.getElementById('f-photo-preview').classList.add('hidden');
   document.getElementById('f-photo-remove-btn').classList.add('hidden');
+  document.getElementById('f-photo-bg-btn').classList.add('hidden');
 }
 
 // ---- Edit-item photo handling ----
 let editPendingPhoto = null;
 let editPendingNutrition = null;
 let editOriginalPhoto = null;
+
+function updateEditBgBtnVisibility(){
+  const btn = document.getElementById('e-photo-bg-btn');
+  if(btn) btn.classList.toggle('hidden', !editPendingPhoto);
+}
 
 function handleEditPhotoChoice(value){
   if(value === 'keep'){
@@ -3095,6 +3619,7 @@ function handleEditPhotoChoice(value){
     preview.classList.add('hidden');
     document.getElementById('e-photo-label').classList.add('hidden');
   }
+  updateEditBgBtnVisibility();
 }
 
 function setEditPhotoFromSrc(src){
@@ -3106,6 +3631,24 @@ function setEditPhotoFromSrc(src){
     // confirm the "new" radio stays selected
     const newRadio = document.querySelector('input[name="e-photo-radio"][value="new"]');
     if(newRadio) newRadio.checked = true;
+    updateEditBgBtnVisibility();
+  });
+}
+
+function runBgRemovalOnEditPhoto(){
+  if(!editPendingPhoto) return;
+  const btn = document.getElementById('e-photo-bg-btn');
+  btn.disabled = true;
+  btn.textContent = '✨ Processing… (can take a few seconds)';
+  removeBackgroundFromPhoto(editPendingPhoto, function(result, err){
+    btn.disabled = false;
+    btn.textContent = '✨ Remove Background';
+    if(err || !result){
+      showInfo('Could not process that photo — check your internet connection (the AI model needs to download the first time) and try again.', 'ℹ️');
+      return;
+    }
+    editPendingPhoto = result;
+    document.getElementById('e-photo-preview').src = result;
   });
 }
 
@@ -3182,6 +3725,8 @@ function startPhotoCatchup(){
   renderPhotoCatchupStep();
 }
 
+let catchupPendingPhoto = null;
+
 function renderPhotoCatchupStep(){
   if(photoCatchupIndex >= photoCatchupQueue.length){
     closePhotoCatchup();
@@ -3194,6 +3739,9 @@ function renderPhotoCatchupStep(){
   document.getElementById('catchupItemLocation').textContent = item.location || '';
   document.getElementById('catchupPreview').classList.add('hidden');
   document.getElementById('catchupPhotoInput').value = '';
+  document.getElementById('catchupBgBtn').classList.add('hidden');
+  document.getElementById('catchupSaveBtn').classList.add('hidden');
+  catchupPendingPhoto = null;
 }
 
 function skipPhotoCatchup(){
@@ -3205,16 +3753,42 @@ function closePhotoCatchup(){
   document.getElementById('photoCatchupModal').classList.add('hidden');
 }
 
-function savePhotoCatchupResult(dataUrl){
-  const item = photoCatchupQueue[photoCatchupIndex];
-  if(!item) return;
+function stageCatchupPhoto(dataUrl){
   resizeImage(dataUrl, function(resized){
-    item.photo = resized;
-    savePhotoToLibrary(item.name, resized);
-    save();
-    photoCatchupIndex++;
-    renderPhotoCatchupStep();
+    catchupPendingPhoto = resized;
+    const preview = document.getElementById('catchupPreview');
+    preview.src = resized;
+    preview.classList.remove('hidden');
+    document.getElementById('catchupBgBtn').classList.remove('hidden');
+    document.getElementById('catchupSaveBtn').classList.remove('hidden');
   });
+}
+
+function runBgRemovalOnCatchupPhoto(){
+  if(!catchupPendingPhoto) return;
+  const btn = document.getElementById('catchupBgBtn');
+  btn.disabled = true;
+  btn.textContent = '✨ Processing… (can take a few seconds)';
+  removeBackgroundFromPhoto(catchupPendingPhoto, function(result, err){
+    btn.disabled = false;
+    btn.textContent = '✨ Remove Background';
+    if(err || !result){
+      showInfo('Could not process that photo — check your internet connection (the AI model needs to download the first time) and try again.', 'ℹ️');
+      return;
+    }
+    catchupPendingPhoto = result;
+    document.getElementById('catchupPreview').src = result;
+  });
+}
+
+function saveCatchupPhotoAndNext(){
+  const item = photoCatchupQueue[photoCatchupIndex];
+  if(!item || !catchupPendingPhoto) return;
+  item.photo = catchupPendingPhoto;
+  savePhotoToLibrary(item.name, catchupPendingPhoto);
+  save();
+  photoCatchupIndex++;
+  renderPhotoCatchupStep();
 }
 
 document.getElementById('catchupPhotoLabel').addEventListener('click', function(){
@@ -3224,10 +3798,10 @@ document.getElementById('catchupPhotoInput').addEventListener('change', function
   const file = e.target.files[0];
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = function(ev){ savePhotoCatchupResult(ev.target.result); };
+  reader.onload = function(ev){ stageCatchupPhoto(ev.target.result); };
   reader.readAsDataURL(file);
 });
-setupPhotoDropZone('catchupDropzone', savePhotoCatchupResult);
+setupPhotoDropZone('catchupDropzone', stageCatchupPhoto);
 
 // ---- Barcode scanning ----
 let scannerStream = null;
@@ -4333,6 +4907,7 @@ function addItem(){
   document.getElementById('f-skip-grocery').checked = false;
   document.getElementById('f-photo-preview').classList.add('hidden');
   document.getElementById('f-photo-remove-btn').classList.add('hidden');
+  document.getElementById('f-photo-bg-btn').classList.add('hidden');
   document.getElementById('f-nutrition-btn').classList.add('hidden');
   showAddPhotoChoice(false);
   autoPhotoDismissedFor = null;
@@ -4460,6 +5035,136 @@ function archiveToBoughtBefore(item){
   syncBoughtBeforeToCloud();
 }
 
+// ---- On Order ----
+let onOrderSelectedIds = new Set();
+
+function openOnOrderModal(){
+  onOrderSelectedIds.clear();
+  renderOnOrderList();
+  document.getElementById('onOrderModal').classList.remove('hidden');
+}
+function closeOnOrderModal(){
+  document.getElementById('onOrderModal').classList.add('hidden');
+}
+
+function renderOnOrderList(){
+  const list = document.getElementById('onOrderList');
+  if(onOrder.length === 0){
+    list.innerHTML = '<p style="text-align:center;color:var(--muted);">Nothing on order right now.</p>';
+    return;
+  }
+  list.innerHTML = onOrder.map(function(o){
+    const isSelected = onOrderSelectedIds.has(o.id);
+    return `<div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;">
+      <div class="checkbox ${isSelected?'checked':''}" onclick="toggleOnOrderSelect('${o.id}')">${isSelected?'✓':''}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;">${escapeHtml(o.name)}${o.qty>1?` ×${o.qty}`:''}</div>
+        <div style="font-size:0.78rem;color:var(--muted);">${escapeHtml(o.location||'')}${o.note?(' · '+escapeHtml(o.note)):''}</div>
+      </div>
+      <button class="icon-btn" onclick="removeOnOrderItem('${o.id}')" title="Remove">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+function toggleOnOrderSelect(id){
+  if(onOrderSelectedIds.has(id)) onOrderSelectedIds.delete(id);
+  else onOrderSelectedIds.add(id);
+  renderOnOrderList();
+}
+
+function removeOnOrderItem(id){
+  openConfirmModal('Remove this from your On Order list?', function(ok){
+    if(!ok) return;
+    onOrder = onOrder.filter(o => o.id !== id);
+    onOrderSelectedIds.delete(id);
+    localStorage.setItem(ON_ORDER_KEY, JSON.stringify(onOrder));
+    syncOnOrderToCloud();
+    renderOnOrderList();
+  });
+}
+
+function openAddOnOrderItemModal(){
+  document.getElementById('oo-name').value = '';
+  document.getElementById('oo-qty').value = 1;
+  document.getElementById('oo-note').value = '';
+  populateLocationSelect(null, 'oo-location');
+  document.getElementById('addOnOrderItemModal').classList.remove('hidden');
+}
+function closeAddOnOrderItemModal(){
+  document.getElementById('addOnOrderItemModal').classList.add('hidden');
+}
+function confirmAddOnOrderItem(){
+  const name = document.getElementById('oo-name').value.trim();
+  if(!name){
+    showInfo('Type an item name first.', 'ℹ️');
+    return;
+  }
+  const qty = parseFloat(document.getElementById('oo-qty').value) || 1;
+  const location = document.getElementById('oo-location').value;
+  const note = document.getElementById('oo-note').value.trim();
+  onOrder.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    name, qty, location, note, addedAt: Date.now()
+  });
+  localStorage.setItem(ON_ORDER_KEY, JSON.stringify(onOrder));
+  syncOnOrderToCloud();
+  logActivity('📦', 'Added "' + name + '" to On Order');
+  closeAddOnOrderItemModal();
+  renderOnOrderList();
+}
+
+function receiveSelectedOnOrderItems(){
+  if(onOrderSelectedIds.size === 0){
+    showInfo('Select at least one item first.', 'ℹ️');
+    return;
+  }
+  const toReceive = onOrder.filter(o => onOrderSelectedIds.has(o.id));
+  toReceive.forEach(function(o){
+    const already = inventory.find(i => normalizeName(i.name) === normalizeName(o.name));
+    if(already){
+      already.qty += o.qty;
+      checkReorder(already);
+    } else {
+      inventory.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+        name: o.name,
+        category: 'Uncategorized',
+        store: null,
+        location: o.location || (LOCATIONS[0] || 'Unassigned'),
+        qty: o.qty,
+        min: appSettings.defaultMin,
+        skipGrocery: false,
+        unit: '',
+        packSize: null,
+        packUnit: null,
+        packsPerBox: null,
+        boxLabel: null,
+        notes: o.note || '',
+        barcode: null,
+        purchaseDate: null,
+        frozenDate: null,
+        expiryDate: null,
+        photo: null,
+        nutrition: null,
+        favorite: false,
+        manuallyLow: false,
+        section: null,
+        price: null
+      });
+    }
+  });
+  const count = toReceive.length;
+  onOrder = onOrder.filter(o => !onOrderSelectedIds.has(o.id));
+  onOrderSelectedIds.clear();
+  localStorage.setItem(ON_ORDER_KEY, JSON.stringify(onOrder));
+  syncOnOrderToCloud();
+  logActivity('✅', `Received ${count} item${count===1?'':'s'} from On Order`);
+  save();
+  closeOnOrderModal();
+  switchTab('inventory');
+  showInfo(`${count} item${count===1?'':'s'} added to inventory.`, '✅');
+}
+
 function openBoughtBeforeModal(){
   document.getElementById('boughtBeforeSearch').value = '';
   renderBoughtBeforeList();
@@ -4564,6 +5269,7 @@ function openEditItem(id){
   editItemId = id;
   editOriginalPhoto = item.photo || null;
   editPendingPhoto = item.photo || null;
+  updateEditBgBtnVisibility();
   editPendingNutrition = item.nutrition || null;
 
   document.getElementById('e-name').value = item.name || '';
@@ -4825,7 +5531,7 @@ function confirmReset(){
 function exportBackup(){
   const data = JSON.stringify({
     inventory, grocery, locations: LOCATIONS, locationPhotos, photoLibrary,
-    settings: appSettings, activityLog, familyMembers, tasks, spendingLog, mealPlan, boughtBefore
+    settings: appSettings, activityLog, familyMembers, tasks, spendingLog, mealPlan, boughtBefore, onOrder
   }, null, 2);
   const filename = 'household_inventory_backup.json';
   const blob = new Blob([data], {type:'application/json'});
@@ -4933,6 +5639,13 @@ function importBackup(e){
         if(boughtBefore.length > 300) boughtBefore = boughtBefore.slice(0, 300);
         localStorage.setItem(BOUGHT_BEFORE_KEY, JSON.stringify(boughtBefore));
         syncBoughtBeforeToCloud();
+      }
+      if(data.onOrder){
+        data.onOrder.forEach(o=>{
+          if(!onOrder.some(x=>x.id===o.id)) onOrder.push(o);
+        });
+        localStorage.setItem(ON_ORDER_KEY, JSON.stringify(onOrder));
+        syncOnOrderToCloud();
       }
       // Settings and meal plan are included in backups for reference but are
       // intentionally NOT auto-applied here — silently overwriting the
@@ -5448,7 +6161,17 @@ function render(){
         <button class="icon-btn" onclick="toggleSkipGrocery('${g.id}')" title="${isSkipped?'Move back to list':'Skip for now'}">${isSkipped?'↩️':'⏸️'}</button>
       </div>`;
 
-    let html = active.map(g=>rowHtml(g, false)).join('');
+    // Group active items by store: items with no store set first (no
+    // header), then each named store gets its own sub-heading, sorted
+    // alphabetically. Skipped items stay in their own flat list below,
+    // since grouping matters most for what you're actively shopping for.
+    const noStore = active.filter(g => !g.store);
+    const storeNames = [...new Set(active.filter(g => g.store).map(g => g.store))].sort((a,b)=>a.localeCompare(b));
+    let html = noStore.map(g=>rowHtml(g, false)).join('');
+    storeNames.forEach(store => {
+      html += `<div class="section-title">🏬 ${escapeHtml(store)}</div>`;
+      html += active.filter(g => g.store === store).map(g=>rowHtml(g, false)).join('');
+    });
 
     if(skipped.length){
       html += `
